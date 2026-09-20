@@ -10,9 +10,10 @@ class AIService {
     this.geminiModel = localStorage.getItem('ds_gemini_model') || 'gemini-2.0-flash';
     this.openRouterModel = localStorage.getItem('ds_openrouter_model') || 'google/gemini-2.0-flash-exp:free';
     this.cachedOpenRouterModels = JSON.parse(localStorage.getItem('ds_cached_or_models') || '[]');
+    this.webSearchEnabled = localStorage.getItem('ds_web_search') === 'true';
   }
 
-  saveConfig({ provider, geminiKey, openRouterKey, geminiModel, openRouterModel }) {
+  saveConfig({ provider, geminiKey, openRouterKey, geminiModel, openRouterModel, webSearchEnabled }) {
     if (provider) {
       this.provider = provider;
       localStorage.setItem('ds_api_provider', provider);
@@ -32,6 +33,10 @@ class AIService {
     if (openRouterModel) {
       this.openRouterModel = openRouterModel;
       localStorage.setItem('ds_openrouter_model', openRouterModel);
+    }
+    if (webSearchEnabled !== undefined) {
+      this.webSearchEnabled = !!webSearchEnabled;
+      localStorage.setItem('ds_web_search', this.webSearchEnabled);
     }
   }
 
@@ -237,7 +242,8 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
         topP: 0.95,
         maxOutputTokens: 2048,
         ...(expectJSON ? { responseMimeType: 'application/json' } : {})
-      }
+      },
+      ...(this.webSearchEnabled && !expectJSON ? { tools: [{ googleSearch: {} }] } : {})
     };
 
     const res = await fetch(url, {
@@ -267,7 +273,7 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
   async callOpenRouter(prompt, expectJSON) {
     if (!this.openRouterKey) throw new Error('OpenRouter API Key is missing. Please enter it in Settings.');
 
-    const model = this.openRouterModel || 'google/gemini-2.0-flash-001';
+    const model = this.openRouterModel || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
@@ -278,7 +284,12 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
       ],
       temperature: 0.7,
       max_tokens: 2048,
-      ...(expectJSON ? { response_format: { type: 'json_object' } } : {})
+      ...(expectJSON ? { response_format: { type: 'json_object' } } : {}),
+      ...(this.webSearchEnabled ? {
+        tools: [
+          { type: 'openrouter:web_search' }
+        ]
+      } : {})
     };
 
     const res = await fetch(url, {

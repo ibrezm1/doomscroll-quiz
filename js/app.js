@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const geminiModelSelect = document.getElementById('gemini-model-select');
   const openRouterKeyInput = document.getElementById('openrouter-key-input');
   const openRouterModelSelect = document.getElementById('openrouter-model-select');
+  const webSearchToggle = document.getElementById('web-search-toggle');
 
   // OpenRouter Model Filter & Refresh Elements
   const refreshOrModelsBtn = document.getElementById('refresh-or-models-btn');
@@ -106,6 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
     geminiKeyInput.value = window.aiService.geminiKey;
     geminiModelSelect.value = window.aiService.geminiModel;
     openRouterKeyInput.value = window.aiService.openRouterKey;
+    if (webSearchToggle) {
+      webSearchToggle.checked = window.aiService.webSearchEnabled;
+    }
 
     setProviderTab(window.aiService.provider);
     updateAudioIcon();
@@ -288,7 +292,8 @@ document.addEventListener('DOMContentLoaded', () => {
       geminiKey: geminiKeyInput.value,
       geminiModel: geminiModelSelect.value,
       openRouterKey: openRouterKeyInput.value,
-      openRouterModel: openRouterModelSelect.value
+      openRouterModel: openRouterModelSelect.value,
+      webSearchEnabled: webSearchToggle ? webSearchToggle.checked : false
     });
     settingsModal.classList.remove('active');
     window.showToast('API Settings Saved! ⚡');

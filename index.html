@@ -101,6 +101,22 @@
           </div>
         </div>
 
+        <button class="primary-btn" id="generate-plan-btn" style="margin-bottom: 20px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+          Generate Learning Plan
+        </button>
+
+        <!-- Saved / Past Learning Topics (Pick Up Where You Left Off) -->
+        <div class="saved-topics-section" id="saved-topics-container" style="display: none; margin-bottom: 20px;">
+          <div class="section-title-row">
+            <span class="preset-title" style="color: #c4b5fd;">📚 Continue Past Topics</span>
+            <span class="saved-count-badge" id="saved-topics-count">0</span>
+          </div>
+          <div class="saved-topics-list" id="saved-topics-list">
+            <!-- Dynamically populated from localStorage by js/history.js -->
+          </div>
+        </div>
+
         <div class="preset-section">
           <div class="preset-title">Trending Topics</div>
           <div class="preset-grid">
@@ -112,11 +128,6 @@
             <button class="preset-pill">Behavioral Economics</button>
           </div>
         </div>
-
-        <button class="primary-btn" id="generate-plan-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
-          Generate Learning Plan
-        </button>
       </div>
     </main>
 
@@ -317,9 +328,16 @@
 
   </div> <!-- End #app-viewport -->
 
-  <!-- Scripts -->
+  <!-- Scripts (Modular Architecture) -->
   <script src="js/sound.js"></script>
+  <script src="js/gemini.js"></script>
+  <script src="js/openrouter.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/logs.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/bookmarks.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/card.js"></script>
   <script src="js/plan.js"></script>
   <script src="js/quiz.js"></script>
   <script src="js/app.js"></script>

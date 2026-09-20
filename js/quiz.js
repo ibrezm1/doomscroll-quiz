@@ -66,7 +66,7 @@ class QuizEngine {
   }
 
   async startQuiz(topic, plan) {
-    this.topic = topic;
+    this.topic = topic || 'General';
     this.plan = plan;
     this.questions = [];
     this.batchIndex = 0;
@@ -80,6 +80,9 @@ class QuizEngine {
     this.answeredQuestions.clear();
     this.feedElement.innerHTML = '';
     this.updateHUD();
+
+    const exitBtn = document.getElementById('exit-quiz-btn');
+    if (exitBtn) exitBtn.style.display = 'flex';
 
     this.saveState();
     this.showInitialLoader();
@@ -99,6 +102,9 @@ class QuizEngine {
     this.moduleQuestionsGenerated = session.moduleQuestionsGenerated || 0;
     this.answeredQuestions.clear();
 
+    const exitBtn = document.getElementById('exit-quiz-btn');
+    if (exitBtn) exitBtn.style.display = 'flex';
+
     this.feedElement.innerHTML = '';
     this.updateHUD();
 
@@ -112,8 +118,25 @@ class QuizEngine {
         targetElem?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     } else {
+      this.showInitialLoader();
       this.fetchNextBatch();
     }
+  }
+
+  exitQuiz() {
+    this.saveState();
+    const screenPrompt = document.getElementById('screen-prompt');
+    const screenPlan = document.getElementById('screen-plan');
+    const screenQuiz = document.getElementById('screen-quiz');
+
+    [screenPlan, screenQuiz].forEach(s => s?.classList.remove('active'));
+    screenPrompt?.classList.add('active');
+
+    const exitBtn = document.getElementById('exit-quiz-btn');
+    if (exitBtn) exitBtn.style.display = 'none';
+
+    window.dispatchEvent(new CustomEvent('ds_topics_updated'));
+    if (window.showToast) window.showToast('Progress saved! 🌟');
   }
 
   saveState() {
@@ -132,16 +155,16 @@ class QuizEngine {
     });
   }
 
-  showInitialLoader() {
-    const firstModule = this.plan?.modules?.[0];
+  showInitialLoader(msg = null) {
+    const firstModule = this.plan?.modules?.[this.currentModuleIndex] || this.plan?.modules?.[0];
     const moduleName = firstModule ? firstModule.title : this.topic;
 
     this.feedElement.innerHTML = `
       <div class="loading-card" id="feed-loader">
         <div class="spinner"></div>
-        <div style="font-weight: 700; font-size: 1.1rem; color: #fff;">Curating Topic #1...</div>
-        <div style="font-size: 0.85rem; color: var(--text-secondary); max-width: 300px; margin: 0 auto;">
-          Generating tailored questions for: <br><strong style="color: #a78bfa;">${moduleName}</strong>
+        <div style="font-weight: 700; font-size: 1.1rem; color: #fff;">Curating Topic #${this.currentModuleIndex + 1}...</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); max-width: 300px; margin: 0 auto; line-height: 1.4;">
+          ${msg || `Generating tailored questions for: <br><strong style="color: #a78bfa;">${this.escapeHtml(moduleName)}</strong>`}
         </div>
       </div>
     `;
@@ -189,16 +212,21 @@ class QuizEngine {
         this.saveState();
       }
     } catch (err) {
-      document.getElementById('feed-loader')?.remove();
+      console.warn('[DoomScroll] Question generation error:', err);
 
       if (this.autoRetryAttempts < 3) {
         this.autoRetryAttempts += 1;
+        if (this.questions.length === 0) {
+          this.showInitialLoader(`<span style="color:#fca5a5">Reconnecting to AI (Attempt ${this.autoRetryAttempts}/3)...</span>`);
+        }
         setTimeout(() => {
           this.isFetchingNextBatch = false;
           this.fetchNextBatch();
         }, 2000);
         return;
       }
+
+      document.getElementById('feed-loader')?.remove();
 
       if (this.questions.length === 0) {
         this.renderErrorCard(err);
@@ -265,18 +293,22 @@ class QuizEngine {
       <div class="loading-card" id="error-card" style="padding: 24px; text-align: center;">
         <div style="font-size: 2.5rem; margin-bottom: 8px;">⚠️</div>
         <div style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 8px;">AI Quiz Generation Failed</div>
-        <div style="font-size: 0.85rem; color: #fb7185; margin-bottom: 20px; line-height: 1.4; background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); padding: 10px 14px; border-radius: 12px;">
-          ${err.message || 'Error communicating with AI.'}
+        <div style="font-size: 0.85rem; color: #fb7185; margin-bottom: 20px; line-height: 1.4; background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); padding: 10px 14px; border-radius: 12px; word-break: break-word;">
+          ${this.escapeHtml(err.message || 'Error communicating with AI.')}
         </div>
         <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px;">
           <button class="primary-btn" id="err-retry-btn" style="padding: 14px;">🔄 Retry Generation</button>
           <button class="secondary-btn" id="err-settings-btn" style="padding: 12px;">⚙️ Configure API Key</button>
+          <button class="secondary-btn" id="err-logs-btn" style="padding: 12px;">📟 Inspect Logs</button>
+          <button class="secondary-btn" id="err-exit-btn" style="padding: 12px;">🏠 Exit to Home</button>
         </div>
       </div>
     `;
 
     document.getElementById('err-retry-btn')?.addEventListener('click', () => this.startQuiz(this.topic, this.plan));
     document.getElementById('err-settings-btn')?.addEventListener('click', () => window.settingsManager?.open());
+    document.getElementById('err-logs-btn')?.addEventListener('click', () => window.logsManager?.open());
+    document.getElementById('err-exit-btn')?.addEventListener('click', () => this.exitQuiz());
   }
 
   updateHUD() {
@@ -290,6 +322,16 @@ class QuizEngine {
       if (this.streak >= 3) streakBadge.classList.add('hot');
       else streakBadge.classList.remove('hot');
     }
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 

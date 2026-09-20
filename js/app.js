@@ -48,12 +48,21 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => toast.classList.remove('show'), 2800);
   };
 
+  const exitQuizBtn = document.getElementById('exit-quiz-btn');
+
   // Screen Switching
   function showScreen(screenId) {
     [screenPrompt, screenPlan, screenQuiz].forEach(s => s?.classList.remove('active'));
     document.getElementById(screenId)?.classList.add('active');
     topHud.style.display = 'flex';
+    if (exitQuizBtn) {
+      exitQuizBtn.style.display = (screenId === 'screen-quiz') ? 'flex' : 'none';
+    }
   }
+
+  exitQuizBtn?.addEventListener('click', () => {
+    window.quizEngine?.exitQuiz();
+  });
 
   function updateAudioIcon() {
     audioIcon.innerHTML = window.soundEngine.muted

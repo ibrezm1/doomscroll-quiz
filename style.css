@@ -210,6 +210,18 @@ html, body {
   background: var(--bg-glass-active);
 }
 
+.exit-quiz-btn {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}
+
+.exit-quiz-btn:hover, .exit-quiz-btn:active {
+  background: rgba(244, 63, 94, 0.25);
+  color: #fff;
+  border-color: var(--danger);
+}
+
 /* ==========================================================================
    SCREEN 1: TOPIC PROMPT
    ========================================================================== */

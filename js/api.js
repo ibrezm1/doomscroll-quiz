@@ -148,15 +148,30 @@ Return ONLY JSON:
 
     const response = await this.callAI(prompt, true, `TOPIC [${moduleIndex + 1}/${totalModules}]: ${currentModule.title}`);
     const parsed = this.cleanAndParseJSON(response);
-    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-      return parsed.questions.map(q => ({
-        ...q,
+
+    let rawQuestions = null;
+    if (Array.isArray(parsed)) {
+      rawQuestions = parsed;
+    } else if (parsed && typeof parsed === 'object') {
+      rawQuestions = parsed.questions || parsed.items || parsed.quiz || parsed.cards || null;
+    }
+
+    if (Array.isArray(rawQuestions) && rawQuestions.length > 0) {
+      return rawQuestions.map((q, idx) => ({
+        id: q.id || `q_mod${moduleIndex + 1}_${Date.now()}_${idx + 1}`,
         moduleIndex: moduleIndex,
         moduleTitle: currentModule.title,
-        topicTargetQuestions: currentModule.targetQuestions || 5
+        topicTargetQuestions: currentModule.targetQuestions || 5,
+        question: q.question || `Key principle in ${currentModule.title}?`,
+        codeSnippet: q.codeSnippet || '',
+        options: (Array.isArray(q.options) && q.options.length >= 2) ? q.options : ['Correct Answer', 'Alternative Choice A', 'Alternative Choice B', 'Alternative Choice C'],
+        correctAnswerIndex: (typeof q.correctAnswerIndex === 'number' && q.correctAnswerIndex >= 0 && q.correctAnswerIndex < 4) ? q.correctAnswerIndex : 0,
+        explanation: q.explanation || `Understanding ${currentModule.title} is essential for mastering this topic.`,
+        perplexityQuery: q.perplexityQuery || `Explain ${q.question || currentModule.title} in depth`
       }));
     }
-    throw new Error(`AI returned an invalid question batch for "${currentModule.title}".`);
+
+    throw new Error(`AI response could not be formatted for "${currentModule.title}". Please inspect logs or retry.`);
   }
 
   async callAI(prompt, expectJSON = false, callType = 'AI_CALL') {
@@ -191,9 +206,10 @@ Return ONLY JSON:
 
     try { return JSON.parse(cleaned); } catch (e) {}
 
+    // Outermost Object { ... }
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       const candidate = cleaned.substring(firstBrace, lastBrace + 1);
       try { return JSON.parse(candidate); } catch (e2) {
         try {
@@ -201,6 +217,19 @@ Return ONLY JSON:
         } catch (e3) {}
       }
     }
+
+    // Outermost Array [ ... ]
+    const firstBracket = cleaned.indexOf('[');
+    const lastBracket = cleaned.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      const candidate = cleaned.substring(firstBracket, lastBracket + 1);
+      try { return JSON.parse(candidate); } catch (e4) {
+        try {
+          return JSON.parse(candidate.replace(/,\s*([\]}])/g, '$1'));
+        } catch (e5) {}
+      }
+    }
+
     return null;
   }
 }

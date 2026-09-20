@@ -26,6 +26,9 @@ class PlanManager {
 
     const { title, summary, difficulty, modules } = this.currentPlan;
 
+    // Calculate Total Questions
+    const totalQuestions = modules.reduce((sum, m) => sum + (parseInt(m.targetQuestions, 10) || 5), 0);
+
     // Update Header
     const planTitleElem = document.getElementById('plan-display-title');
     const planSummaryElem = document.getElementById('plan-display-summary');
@@ -33,11 +36,13 @@ class PlanManager {
 
     if (planTitleElem) planTitleElem.textContent = title || `Learning Plan`;
     if (planSummaryElem) planSummaryElem.textContent = summary || `Review and adjust your learning milestones below:`;
-    if (planBadgeElem) planBadgeElem.textContent = `${difficulty || 'Intermediate'} Curriculum • ${modules.length} Milestones`;
+    if (planBadgeElem) planBadgeElem.textContent = `${difficulty || 'Intermediate'} • ${modules.length} Milestones • 🎯 ${totalQuestions} Total Questions`;
 
     // Render Modules List
     this.container.innerHTML = '';
     modules.forEach((mod, idx) => {
+      if (!mod.targetQuestions) mod.targetQuestions = 5;
+
       const item = document.createElement('div');
       item.className = 'plan-item';
       item.dataset.index = idx;
@@ -47,6 +52,16 @@ class PlanManager {
         <div class="plan-item-content">
           <input type="text" class="plan-item-input" value="${this.escapeHtml(mod.title)}" data-field="title" placeholder="Module Title" />
           <input type="text" class="plan-item-detail" value="${this.escapeHtml(mod.summary || (mod.keyConcepts ? mod.keyConcepts.join(', ') : ''))}" data-field="summary" placeholder="Key concepts or focus areas" />
+          
+          <!-- Question Allocation Stepper -->
+          <div class="plan-q-alloc-row">
+            <span class="plan-q-alloc-label">Questions:</span>
+            <div class="q-stepper">
+              <button class="q-stepper-btn minus-btn" data-index="${idx}" title="Decrease questions">−</button>
+              <span class="q-stepper-val">${mod.targetQuestions} Qs</span>
+              <button class="q-stepper-btn plus-btn" data-index="${idx}" title="Increase questions">+</button>
+            </div>
+          </div>
         </div>
         <div class="plan-item-actions">
           <button class="plan-action-btn delete-btn" title="Delete Module" data-index="${idx}">
@@ -59,6 +74,8 @@ class PlanManager {
       const titleInput = item.querySelector('[data-field="title"]');
       const summaryInput = item.querySelector('[data-field="summary"]');
       const deleteBtn = item.querySelector('.delete-btn');
+      const minusBtn = item.querySelector('.minus-btn');
+      const plusBtn = item.querySelector('.plus-btn');
 
       titleInput.addEventListener('input', (e) => {
         this.currentPlan.modules[idx].title = e.target.value;
@@ -72,6 +89,22 @@ class PlanManager {
         this.removeModule(idx);
       });
 
+      minusBtn.addEventListener('click', () => {
+        if (this.currentPlan.modules[idx].targetQuestions > 1) {
+          this.currentPlan.modules[idx].targetQuestions -= 1;
+          this.render();
+          if (window.soundEngine) window.soundEngine.playTap();
+        }
+      });
+
+      plusBtn.addEventListener('click', () => {
+        if (this.currentPlan.modules[idx].targetQuestions < 30) {
+          this.currentPlan.modules[idx].targetQuestions += 1;
+          this.render();
+          if (window.soundEngine) window.soundEngine.playTap();
+        }
+      });
+
       this.container.appendChild(item);
     });
   }
@@ -83,7 +116,8 @@ class PlanManager {
       id: newIdx,
       title: `Milestone ${newIdx}: New Topic`,
       summary: `Focus on core principles and practical examples`,
-      keyConcepts: ['Concepts', 'Best Practices']
+      keyConcepts: ['Concepts', 'Best Practices'],
+      targetQuestions: 5
     });
     this.render();
     if (window.soundEngine) window.soundEngine.playTap();

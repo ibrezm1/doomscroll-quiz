@@ -131,6 +131,7 @@ class AIService {
 
     const systemPrompt = `You are an expert curriculum designer and educator. The user wants to learn: "${topic}" at a "${difficulty}" level.
 Create a high-impact, focused learning curriculum composed of 4 to 6 sequential learning modules.
+For each module, assign an appropriate target number of quiz questions (e.g. between 3 and 8 questions, defaulting to 5).
 
 Return ONLY a valid JSON object matching this schema without any markdown formatting or commentary:
 {
@@ -143,7 +144,8 @@ Return ONLY a valid JSON object matching this schema without any markdown format
       "id": 1,
       "title": "Module Title",
       "summary": "1 sentence describing key concepts in this milestone",
-      "keyConcepts": ["Concept 1", "Concept 2", "Concept 3"]
+      "keyConcepts": ["Concept 1", "Concept 2", "Concept 3"],
+      "targetQuestions": 5
     }
   ]
 }`;
@@ -358,25 +360,29 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
           id: 1,
           title: `Foundations & Core Principles of ${topic}`,
           summary: `Master fundamental terminology, design architecture, and first-principles mental models.`,
-          keyConcepts: ['Core Architecture', 'Key Definitions', 'Mental Models']
+          keyConcepts: ['Core Architecture', 'Key Definitions', 'Mental Models'],
+          targetQuestions: 5
         },
         {
           id: 2,
           title: `Mechanisms & Under-the-Hood Operations`,
           summary: `Understand how the system executes, coordinates state, and processes data internally.`,
-          keyConcepts: ['State Management', 'Execution Lifecycle', 'Data Flow']
+          keyConcepts: ['State Management', 'Execution Lifecycle', 'Data Flow'],
+          targetQuestions: 6
         },
         {
           id: 3,
           title: `Common Pitfalls & Edge Cases`,
           summary: `Analyze common failure modes, performance bottlenecks, and debugging techniques.`,
-          keyConcepts: ['Anti-Patterns', 'Performance Bottlenecks', 'Error Handling']
+          keyConcepts: ['Anti-Patterns', 'Performance Bottlenecks', 'Error Handling'],
+          targetQuestions: 5
         },
         {
           id: 4,
           title: `Advanced Strategies & Real-World Application`,
           summary: `Apply enterprise best practices, scalable design patterns, and optimization techniques.`,
-          keyConcepts: ['Scalability', 'Security & Best Practices', 'Production Patterns']
+          keyConcepts: ['Scalability', 'Security & Best Practices', 'Production Patterns'],
+          targetQuestions: 5
         }
       ]
     };

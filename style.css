@@ -528,6 +528,61 @@ html, body {
   color: var(--danger);
 }
 
+/* Plan Question Allocation Stepper */
+.plan-q-alloc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.plan-q-alloc-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.q-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-glass);
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+}
+
+.q-stepper-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.q-stepper-btn:hover, .q-stepper-btn:active {
+  background: var(--primary);
+  transform: scale(1.1);
+}
+
+.q-stepper-val {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #a78bfa;
+  min-width: 38px;
+  text-align: center;
+}
+
 .add-module-btn {
   width: 100%;
   padding: 12px;

@@ -1392,3 +1392,150 @@ html, body {
   0% { box-shadow: 0 0 6px rgba(251, 146, 60, 0.2); }
   100% { box-shadow: 0 0 18px rgba(251, 146, 60, 0.6); }
 }
+
+/* ==========================================================================
+   AI REQUEST & RESPONSE LOGS INSPECTOR STYLES
+   ========================================================================== */
+.logs-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #07080f;
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.logs-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 66dvh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.log-card {
+  background: #0d0f18;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  transition: all 0.2s;
+}
+
+.log-card.success {
+  border-left: 3px solid #10b981;
+}
+
+.log-card.error {
+  border-left: 3px solid #f43f5e;
+}
+
+.log-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.log-title-pill {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-meta-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+}
+
+.log-meta-tag.status-ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.log-meta-tag.status-err {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.log-subinfo {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.log-details {
+  margin-top: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.log-summary {
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #c4b5fd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.log-summary:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.json-viewer-wrapper {
+  position: relative;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: #07080d;
+}
+
+.json-code {
+  font-family: var(--font-code);
+  font-size: 0.72rem;
+  color: #38bdf8;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.copy-json-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.copy-json-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}

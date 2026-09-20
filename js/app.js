@@ -504,6 +504,192 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ==========================================================================
+  // LOGS INSPECTOR (LIVE REQUEST & RESPONSE JSON VIEWER)
+  // ==========================================================================
+  const logsHudBtn = document.getElementById('logs-hud-btn');
+  const logsBadgeCount = document.getElementById('logs-badge-count');
+  const logsModal = document.getElementById('logs-modal');
+  const closeLogsBtn = document.getElementById('close-logs-btn');
+  const clearLogsBtn = document.getElementById('clear-logs-btn');
+  const logsList = document.getElementById('logs-list');
+
+  const filterLogsAll = document.getElementById('filter-logs-all');
+  const filterLogsSuccess = document.getElementById('filter-logs-success');
+  const filterLogsError = document.getElementById('filter-logs-error');
+
+  let logsFilter = 'all';
+
+  function updateLogsBadge() {
+    const logs = window.aiService.getLogs();
+    if (logsBadgeCount) {
+      logsBadgeCount.textContent = logs.length;
+      logsBadgeCount.style.display = logs.length > 0 ? 'flex' : 'none';
+    }
+  }
+
+  function renderLogsList() {
+    if (!logsList) return;
+    const allLogs = window.aiService.getLogs();
+
+    const filtered = allLogs.filter(item => {
+      if (logsFilter === 'success') return item.success;
+      if (logsFilter === 'error') return !item.success;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      logsList.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 40px 10px;">
+          <div style="font-size: 2rem; margin-bottom: 8px;">📡</div>
+          <div style="font-weight: 700;">No API call logs recorded yet</div>
+          <div style="font-size: 0.8rem; margin-top: 4px;">Outbound requests and response JSON will appear here in real-time as you generate plans, test connections, or doomscroll questions.</div>
+        </div>
+      `;
+      return;
+    }
+
+    logsList.innerHTML = filtered.map(log => {
+      const isSuccess = log.success;
+      const statusClass = isSuccess ? 'status-ok' : 'status-err';
+      const cardClass = isSuccess ? 'success' : 'error';
+      const statusText = isSuccess ? `${log.status || 200} OK` : `${log.status || 'ERR'}`;
+
+      const requestJSON = JSON.stringify(log.request || {}, null, 2);
+      const responseJSON = JSON.stringify(log.response || {}, null, 2);
+
+      return `
+        <div class="log-card ${cardClass}" id="${log.id}">
+          <div class="log-header-row">
+            <span class="log-title-pill">
+              <span>${isSuccess ? '🟢' : '🔴'}</span>
+              <span>${log.type || 'AI CALL'}</span>
+            </span>
+            <span class="log-meta-tag ${statusClass}">
+              ${statusText} • ${log.latency || 0}ms
+            </span>
+          </div>
+
+          <div class="log-subinfo">
+            <span><strong>Provider:</strong> ${log.provider || 'AI'}</span>
+            <span><strong>Model:</strong> ${log.model || 'default'}</span>
+            <span><strong>Time:</strong> ${log.time}</span>
+          </div>
+
+          <!-- Collapsible Request JSON -->
+          <details class="log-details" open>
+            <summary class="log-summary">
+              <span>📤 Request Payload & Prompt</span>
+              <button class="copy-json-btn copy-req-btn" data-target="${log.id}_req">Copy JSON</button>
+            </summary>
+            <div class="json-viewer-wrapper">
+              <pre class="json-code" id="${log.id}_req"><code>${escapeCode(requestJSON)}</code></pre>
+            </div>
+          </details>
+
+          <!-- Collapsible Response JSON -->
+          <details class="log-details" open>
+            <summary class="log-summary">
+              <span>📥 Response JSON Body</span>
+              <button class="copy-json-btn copy-res-btn" data-target="${log.id}_res">Copy JSON</button>
+            </summary>
+            <div class="json-viewer-wrapper">
+              <pre class="json-code" id="${log.id}_res" style="color: ${isSuccess ? '#34d399' : '#fb7185'};"><code>${escapeCode(responseJSON)}</code></pre>
+            </div>
+          </details>
+        </div>
+      `;
+    }).join('');
+
+    // Attach copy buttons
+    logsList.querySelectorAll('.copy-req-btn, .copy-res-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const targetId = btn.dataset.target;
+        const targetElem = document.getElementById(targetId);
+        if (targetElem) {
+          navigator.clipboard.writeText(targetElem.textContent).then(() => {
+            btn.textContent = 'Copied! ✓';
+            setTimeout(() => { btn.textContent = 'Copy JSON'; }, 2000);
+          });
+        }
+      });
+    });
+  }
+
+  function escapeCode(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // Logs Modal Listeners
+  if (logsHudBtn) {
+    logsHudBtn.addEventListener('click', () => {
+      renderLogsList();
+      logsModal.classList.add('active');
+    });
+  }
+
+  if (closeLogsBtn) {
+    closeLogsBtn.addEventListener('click', () => {
+      logsModal.classList.remove('active');
+    });
+  }
+
+  if (clearLogsBtn) {
+    clearLogsBtn.addEventListener('click', () => {
+      window.aiService.clearLogs();
+      renderLogsList();
+      updateLogsBadge();
+      window.showToast('All API logs cleared');
+    });
+  }
+
+  if (logsModal) {
+    logsModal.addEventListener('click', (e) => {
+      if (e.target === logsModal) logsModal.classList.remove('active');
+    });
+  }
+
+  // Log filter buttons
+  if (filterLogsAll && filterLogsSuccess && filterLogsError) {
+    filterLogsAll.addEventListener('click', () => {
+      logsFilter = 'all';
+      filterLogsAll.classList.add('active');
+      filterLogsSuccess.classList.remove('active');
+      filterLogsError.classList.remove('active');
+      renderLogsList();
+    });
+
+    filterLogsSuccess.addEventListener('click', () => {
+      logsFilter = 'success';
+      filterLogsSuccess.classList.add('active');
+      filterLogsAll.classList.remove('active');
+      filterLogsError.classList.remove('active');
+      renderLogsList();
+    });
+
+    filterLogsError.addEventListener('click', () => {
+      logsFilter = 'error';
+      filterLogsError.classList.add('active');
+      filterLogsAll.classList.remove('active');
+      filterLogsSuccess.classList.remove('active');
+      renderLogsList();
+    });
+  }
+
+  // Real-time Event Listener for incoming logs
+  window.addEventListener('ds_log_updated', () => {
+    updateLogsBadge();
+    if (logsModal && logsModal.classList.contains('active')) {
+      renderLogsList();
+    }
+  });
+
   // Keyboard navigation for testing (Arrow Up / Down)
   window.addEventListener('keydown', (e) => {
     if (screenQuiz.classList.contains('active')) {
@@ -518,4 +704,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initial setup check
   loadSettings();
+  updateLogsBadge();
 });

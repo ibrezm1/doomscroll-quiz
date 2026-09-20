@@ -7,10 +7,32 @@ class AIService {
     this.provider = localStorage.getItem('ds_api_provider') || 'gemini';
     this.geminiKey = localStorage.getItem('ds_gemini_key') || '';
     this.openRouterKey = localStorage.getItem('ds_openrouter_key') || '';
-    this.geminiModel = localStorage.getItem('ds_gemini_model') || 'gemini-2.0-flash';
     this.openRouterModel = localStorage.getItem('ds_openrouter_model') || 'google/gemini-2.0-flash-exp:free';
     this.cachedOpenRouterModels = JSON.parse(localStorage.getItem('ds_cached_or_models') || '[]');
     this.webSearchEnabled = localStorage.getItem('ds_web_search') === 'true';
+    this.logs = [];
+  }
+
+  addLog(entry) {
+    const logItem = {
+      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      time: new Date().toLocaleTimeString(),
+      ...entry
+    };
+    this.logs.unshift(logItem);
+    if (this.logs.length > 50) this.logs.pop(); // keep last 50 calls
+    console.log(`[DeepScroll AI Log ${logItem.type}]`, logItem);
+    window.dispatchEvent(new CustomEvent('ds_log_updated', { detail: logItem }));
+    return logItem;
+  }
+
+  getLogs() {
+    return this.logs;
+  }
+
+  clearLogs() {
+    this.logs = [];
+    window.dispatchEvent(new CustomEvent('ds_log_updated', { detail: null }));
   }
 
   saveConfig({ provider, geminiKey, openRouterKey, geminiModel, openRouterModel, webSearchEnabled }) {
@@ -65,7 +87,7 @@ class AIService {
 
     const startTime = performance.now();
     const prompt = 'Respond with JSON: {"status": "ok", "message": "connected"}';
-    const result = await this.callAI(prompt, true);
+    const result = await this.callAI(prompt, true, 'TEST_CONNECTION');
     const latencyMs = Math.round(performance.now() - startTime);
 
     return {
@@ -168,7 +190,7 @@ Return ONLY a valid JSON object matching this schema without any markdown format
 }`;
 
     try {
-      const response = await this.callAI(systemPrompt, true);
+      const response = await this.callAI(systemPrompt, true, `PLAN_GEN: ${topic}`);
       const parsed = this.cleanAndParseJSON(response);
       if (parsed && Array.isArray(parsed.modules) && parsed.modules.length > 0) {
         return parsed;
@@ -226,7 +248,7 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
 }`;
 
     try {
-      const response = await this.callAI(prompt, true);
+      const response = await this.callAI(prompt, true, `BATCH_GEN #${batchNumber}: ${topic}`);
       const parsed = this.cleanAndParseJSON(response);
       if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         return parsed.questions;
@@ -239,16 +261,16 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
   }
 
   // Core AI Dispatcher
-  async callAI(prompt, expectJSON = false) {
+  async callAI(prompt, expectJSON = false, callType = 'AI_CALL') {
     if (this.provider === 'gemini') {
-      return this.callGemini(prompt, expectJSON);
+      return this.callGemini(prompt, expectJSON, callType);
     } else {
-      return this.callOpenRouter(prompt, expectJSON);
+      return this.callOpenRouter(prompt, expectJSON, callType);
     }
   }
 
   // Gemini API Implementation
-  async callGemini(prompt, expectJSON) {
+  async callGemini(prompt, expectJSON, callType = 'GEMINI_CALL') {
     if (!this.geminiKey) throw new Error('Google Gemini API Key is missing. Please enter it in Settings.');
 
     const model = this.geminiModel || 'gemini-2.0-flash';
@@ -265,31 +287,90 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
       ...(this.webSearchEnabled && !expectJSON ? { tools: [{ googleSearch: {} }] } : {})
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    const startTime = performance.now();
+    let res, errData = null, rawText = null;
 
-    if (!res.ok) {
-      const errText = await res.text();
-      let errorMsg = `Gemini API Error (${res.status})`;
-      try {
-        const errJson = JSON.parse(errText);
-        errorMsg = errJson.error?.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const latency = Math.round(performance.now() - startTime);
+
+      if (!res.ok) {
+        errData = await res.text();
+        let errorMsg = `Gemini API Error (${res.status})`;
+        try {
+          const errJson = JSON.parse(errData);
+          errorMsg = errJson.error?.message || errorMsg;
+        } catch (e) {}
+
+        this.addLog({
+          type: callType,
+          provider: 'Gemini',
+          model: model,
+          url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          status: res.status,
+          success: false,
+          latency: latency,
+          request: {
+            endpoint: url.replace(this.geminiKey, 'AIzaSy***[MASKED]'),
+            body: body
+          },
+          response: { error: errorMsg, raw: errData }
+        });
+
+        throw new Error(errorMsg);
+      }
+
+      const data = await res.json();
+      const candidate = data.candidates?.[0];
+      rawText = candidate?.content?.parts?.[0]?.text;
+      if (!rawText) throw new Error('Empty response from Gemini API');
+
+      let parsedJSON = null;
+      try { parsedJSON = JSON.parse(rawText); } catch(e) {}
+
+      this.addLog({
+        type: callType,
+        provider: 'Gemini',
+        model: model,
+        url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        status: res.status,
+        success: true,
+        latency: latency,
+        request: {
+          endpoint: url.replace(this.geminiKey, 'AIzaSy***[MASKED]'),
+          body: body
+        },
+        response: {
+          parsed: parsedJSON,
+          raw: data
+        }
+      });
+
+      return rawText;
+    } catch (err) {
+      if (!res) {
+        this.addLog({
+          type: callType,
+          provider: 'Gemini',
+          model: model,
+          status: 'NETWORK_ERR',
+          success: false,
+          latency: Math.round(performance.now() - startTime),
+          request: { body: body },
+          response: { error: err.message }
+        });
+      }
+      throw err;
     }
-
-    const data = await res.json();
-    const candidate = data.candidates?.[0];
-    const text = candidate?.content?.parts?.[0]?.text;
-    if (!text) throw new Error('Empty response from Gemini API');
-    return text;
   }
 
   // OpenRouter API Implementation
-  async callOpenRouter(prompt, expectJSON) {
+  async callOpenRouter(prompt, expectJSON, callType = 'OPENROUTER_CALL') {
     if (!this.openRouterKey) throw new Error('OpenRouter API Key is missing. Please enter it in Settings.');
 
     const model = this.openRouterModel || 'google/gemini-2.0-flash-exp:free';
@@ -311,29 +392,90 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
       } : {})
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.openRouterKey}`
-      },
-      body: JSON.stringify(body)
-    });
+    const startTime = performance.now();
+    let res, errData = null;
 
-    if (!res.ok) {
-      const errText = await res.text();
-      let errorMsg = `OpenRouter API Error (${res.status})`;
-      try {
-        const errJson = JSON.parse(errText);
-        errorMsg = errJson.error?.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.openRouterKey}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      const latency = Math.round(performance.now() - startTime);
+
+      if (!res.ok) {
+        errData = await res.text();
+        let errorMsg = `OpenRouter API Error (${res.status})`;
+        try {
+          const errJson = JSON.parse(errData);
+          errorMsg = errJson.error?.message || errorMsg;
+        } catch (e) {}
+
+        this.addLog({
+          type: callType,
+          provider: 'OpenRouter',
+          model: model,
+          url: url,
+          status: res.status,
+          success: false,
+          latency: latency,
+          request: {
+            url: url,
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-or-***[MASKED]' },
+            body: body
+          },
+          response: { error: errorMsg, raw: errData }
+        });
+
+        throw new Error(errorMsg);
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error('Empty response from OpenRouter API');
+
+      let parsedJSON = null;
+      try { parsedJSON = JSON.parse(content); } catch(e) {}
+
+      this.addLog({
+        type: callType,
+        provider: 'OpenRouter',
+        model: model,
+        url: url,
+        status: res.status,
+        success: true,
+        latency: latency,
+        request: {
+          url: url,
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-or-***[MASKED]' },
+          body: body
+        },
+        response: {
+          parsed: parsedJSON,
+          raw: data
+        }
+      });
+
+      return content;
+    } catch (err) {
+      if (!res) {
+        this.addLog({
+          type: callType,
+          provider: 'OpenRouter',
+          model: model,
+          status: 'NETWORK_ERR',
+          success: false,
+          latency: Math.round(performance.now() - startTime),
+          request: { body: body },
+          response: { error: err.message }
+        });
+      }
+      throw err;
     }
-
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Empty response from OpenRouter API');
-    return content;
   }
 
   // JSON Extraction helper

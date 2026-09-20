@@ -129,6 +129,11 @@ document.addEventListener('DOMContentLoaded', () => {
   regenPlanBtn?.addEventListener('click', () => showScreen('screen-prompt'));
 
   startQuizBtn?.addEventListener('click', () => {
+    if (window.planManager?.activeMode === 'json') {
+      const ok = window.planManager.applyJsonChanges(false);
+      if (!ok) return; // Don't start if JSON syntax error
+    }
+
     const finalPlan = window.planManager.getPlan();
     if (!finalPlan?.modules?.length) {
       window.showToast('Please add at least 1 milestone');

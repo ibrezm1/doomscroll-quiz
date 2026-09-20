@@ -132,25 +132,49 @@
     </main>
 
     <!-- ====================================================================
-         SCREEN 2: PLAN REVIEW & INTERACTIVE EDITOR
+         SCREEN 2: PLAN REVIEW & INTERACTIVE EDITOR (VISUAL & JSON)
          ==================================================================== -->
     <section class="screen" id="screen-plan">
       <div class="plan-container">
         <div class="plan-header">
-          <div class="plan-title-badge" id="plan-display-badge">Curriculum Plan</div>
+          <div class="plan-header-top">
+            <div class="plan-title-badge" id="plan-display-badge">Curriculum Plan</div>
+            <div class="plan-view-switch">
+              <button class="plan-view-tab active" id="plan-tab-visual">🎨 Visual</button>
+              <button class="plan-view-tab" id="plan-tab-json">{ } JSON</button>
+            </div>
+          </div>
           <h2 class="plan-main-title" id="plan-display-title">Mastering Topic</h2>
           <p class="plan-description" id="plan-display-summary">Review and customize your learning milestones:</p>
         </div>
 
-        <!-- Editable Modules List -->
-        <div class="plan-list" id="plan-list">
-          <!-- Populated by js/plan.js -->
+        <!-- 1. Visual Interactive Milestone Cards -->
+        <div id="plan-visual-container">
+          <div class="plan-list" id="plan-list">
+            <!-- Populated by js/plan.js -->
+          </div>
+
+          <button class="add-module-btn" id="add-module-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Add Custom Milestone
+          </button>
         </div>
 
-        <button class="add-module-btn" id="add-module-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Add Custom Milestone
-        </button>
+        <!-- 2. Raw JSON Editor & Importer -->
+        <div id="plan-json-container" style="display: none; margin-bottom: 24px;">
+          <div class="plan-json-toolbar">
+            <span class="plan-json-label">Curriculum JSON Schema:</span>
+            <div style="display:flex; gap:6px;">
+              <button class="mini-action-btn" id="plan-json-format-btn" title="Prettify & Format JSON">✨ Format</button>
+              <button class="mini-action-btn" id="plan-json-copy-btn" title="Copy JSON to Clipboard">📋 Copy</button>
+            </div>
+          </div>
+          <textarea class="plan-json-textarea" id="plan-json-input" spellcheck="false" placeholder="Curriculum JSON structure..."></textarea>
+          <div class="plan-json-error" id="plan-json-error" style="display: none;"></div>
+          <button class="secondary-btn" id="plan-json-apply-btn" style="width: 100%; margin-top: 10px; background: rgba(139, 92, 246, 0.2); border-color: var(--primary); color: #fff;">
+            Apply JSON Changes ✓
+          </button>
+        </div>
       </div>
 
       <div class="plan-bottom-bar">

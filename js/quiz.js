@@ -131,7 +131,46 @@ class QuizEngine {
       }
     } catch (err) {
       console.error('Failed to load question batch:', err);
-      if (window.showToast) window.showToast('Could not load next batch. Retrying in background...');
+      const initialLoader = document.getElementById('feed-loader');
+      if (initialLoader) initialLoader.remove();
+
+      if (this.questions.length === 0) {
+        // Display interactive error card
+        this.feedElement.innerHTML = `
+          <div class="loading-card" id="error-card" style="padding: 24px; text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 8px;">⚠️</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 8px;">AI Quiz Generation Failed</div>
+            <div style="font-size: 0.85rem; color: #fb7185; margin-bottom: 20px; line-height: 1.4; background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3); padding: 10px 14px; border-radius: 12px;">
+              ${this.escapeHtml(err.message || 'Error communicating with AI.')}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px;">
+              <button class="primary-btn" id="err-retry-btn" style="padding: 14px;">🔄 Retry Generation</button>
+              <button class="secondary-btn" id="err-settings-btn" style="padding: 12px;">⚙️ Configure API Key</button>
+              <button class="secondary-btn" id="err-logs-btn" style="padding: 12px;">📟 Inspect Logs</button>
+            </div>
+          </div>
+        `;
+
+        const retryBtn = document.getElementById('err-retry-btn');
+        const settingsBtn = document.getElementById('err-settings-btn');
+        const logsBtn = document.getElementById('err-logs-btn');
+
+        if (retryBtn) retryBtn.addEventListener('click', () => {
+          this.startQuiz(this.topic, this.plan);
+        });
+
+        if (settingsBtn) settingsBtn.addEventListener('click', () => {
+          const sm = document.getElementById('settings-modal');
+          if (sm) sm.classList.add('active');
+        });
+
+        if (logsBtn) logsBtn.addEventListener('click', () => {
+          const lm = document.getElementById('logs-modal');
+          if (lm) lm.classList.add('active');
+        });
+      } else {
+        if (window.showToast) window.showToast(`Batch #${this.batchIndex} error: ${err.message}`);
+      }
     } finally {
       this.isFetchingNextBatch = false;
     }

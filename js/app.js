@@ -395,11 +395,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    if (!window.aiService.hasValidKey()) {
+      window.showToast('Please enter your API Key in Settings ⚙️ to generate real AI plans.');
+      loadSettings();
+      settingsModal.classList.add('active');
+      return;
+    }
+
     activeTopic = topic;
     generatePlanBtn.disabled = true;
     generatePlanBtn.innerHTML = `
       <div class="spinner" style="width:20px;height:20px;border-width:2px;"></div>
-      Generating Learning Plan...
+      <span>Generating AI Curriculum...</span>
     `;
 
     try {
@@ -407,7 +414,13 @@ document.addEventListener('DOMContentLoaded', () => {
       window.planManager.setPlan(plan);
       showScreen('screen-plan');
     } catch (err) {
-      window.showToast('Failed to generate plan: ' + err.message);
+      console.error('Plan generation failed:', err);
+      window.showToast(err.message || 'Failed to generate plan.');
+      // If error is related to missing or invalid key, open settings
+      if (err.message.includes('API Key') || err.message.includes('401') || err.message.includes('unauthorized')) {
+        loadSettings();
+        settingsModal.classList.add('active');
+      }
     } finally {
       generatePlanBtn.disabled = false;
       generatePlanBtn.innerHTML = `

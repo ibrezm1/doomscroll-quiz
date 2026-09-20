@@ -165,14 +165,14 @@ class AIService {
   // Generate Learning Plan from Topic
   async generateLearningPlan(topic, difficulty = 'Intermediate') {
     if (!this.hasValidKey()) {
-      return this.getMockPlan(topic, difficulty);
+      throw new Error(`No ${this.provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'} API Key found. Please tap Settings (⚙️) and enter your API key to generate real AI plans.`);
     }
 
     const systemPrompt = `You are an expert curriculum designer and educator. The user wants to learn: "${topic}" at a "${difficulty}" level.
 Create a high-impact, focused learning curriculum composed of 4 to 6 sequential learning modules.
 For each module, assign an appropriate target number of quiz questions (e.g. between 3 and 8 questions, defaulting to 5).
 
-Return ONLY a valid JSON object matching this schema without any markdown formatting or commentary:
+IMPORTANT: Return ONLY a valid JSON object matching this schema without any markdown commentary:
 {
   "topic": "${topic}",
   "difficulty": "${difficulty}",
@@ -189,23 +189,18 @@ Return ONLY a valid JSON object matching this schema without any markdown format
   ]
 }`;
 
-    try {
-      const response = await this.callAI(systemPrompt, true, `PLAN_GEN: ${topic}`);
-      const parsed = this.cleanAndParseJSON(response);
-      if (parsed && Array.isArray(parsed.modules) && parsed.modules.length > 0) {
-        return parsed;
-      }
-      throw new Error('Invalid JSON structure received');
-    } catch (err) {
-      console.warn('AI Plan Generation failed, using intelligent fallback:', err);
-      return this.getMockPlan(topic, difficulty);
+    const response = await this.callAI(systemPrompt, true, `PLAN_GEN: ${topic}`);
+    const parsed = this.cleanAndParseJSON(response);
+    if (parsed && Array.isArray(parsed.modules) && parsed.modules.length > 0) {
+      return parsed;
     }
+    throw new Error('AI returned an unexpected format. Please check the logs (📟) or try again.');
   }
 
   // Generate a Batch of 5 Questions based on Learning Plan
   async generateQuestionBatch(topic, plan, batchNumber = 1, count = 5, previousQuestions = []) {
     if (!this.hasValidKey()) {
-      return this.getMockBatch(topic, plan, batchNumber, count);
+      throw new Error(`No ${this.provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'} API Key found. Please add your key in Settings (⚙️).`);
     }
 
     const planSummary = plan.modules.map((m, i) => `${i + 1}. ${m.title}: ${m.keyConcepts ? m.keyConcepts.join(', ') : m.summary}`).join('\n');
@@ -224,7 +219,7 @@ ${prevList || 'None yet'}
 Generate exactly ${count} challenging, insightful multiple-choice questions grounded in the plan modules.
 For each question, also generate an optimized search query specifically for Perplexity AI deep-dive exploration.
 
-Return ONLY a valid JSON object matching this exact structure with NO surrounding markdown or backticks:
+IMPORTANT: Return ONLY a valid JSON object matching this exact structure with NO markdown formatting:
 {
   "batch": ${batchNumber},
   "questions": [
@@ -233,7 +228,7 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
       "moduleIndex": 0,
       "moduleTitle": "Name of relevant module",
       "question": "Clear, engaging question prompt?",
-      "codeSnippet": "optional code snippet or leave empty string if not code",
+      "codeSnippet": "",
       "options": [
         "First option",
         "Second option",
@@ -247,17 +242,12 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
   ]
 }`;
 
-    try {
-      const response = await this.callAI(prompt, true, `BATCH_GEN #${batchNumber}: ${topic}`);
-      const parsed = this.cleanAndParseJSON(response);
-      if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-        return parsed.questions;
-      }
-      throw new Error('Invalid batch JSON received');
-    } catch (err) {
-      console.warn('AI Batch Generation failed, using fallback batch:', err);
-      return this.getMockBatch(topic, plan, batchNumber, count);
+    const response = await this.callAI(prompt, true, `BATCH_GEN #${batchNumber}: ${topic}`);
+    const parsed = this.cleanAndParseJSON(response);
+    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+      return parsed.questions;
     }
+    throw new Error('AI returned an unparseable batch response. Check the Logs (📟) for details.');
   }
 
   // Core AI Dispatcher
@@ -369,23 +359,28 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
     }
   }
 
-  // OpenRouter API Implementation
-  async callOpenRouter(prompt, expectJSON, callType = 'OPENROUTER_CALL') {
+  // OpenRouter API Implementation with Auto-Retry on unsupported parameters
+  async callOpenRouter(prompt, expectJSON, callType = 'OPENROUTER_CALL', isRetry = false) {
     if (!this.openRouterKey) throw new Error('OpenRouter API Key is missing. Please enter it in Settings.');
 
     const model = this.openRouterModel || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
+    // System prompt guarantees JSON even without response_format
+    const systemPrompt = expectJSON
+      ? 'You are an expert AI. You MUST respond with ONLY a raw valid JSON object. Do not wrap in markdown or backticks. Do not include introductory text.'
+      : 'You are a helpful AI assistant.';
+
     const body = {
       model: model,
       messages: [
-        { role: 'system', content: expectJSON ? 'You are an AI that outputs strictly valid JSON without markdown formatting.' : 'You are a helpful AI assistant.' },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
       ],
       temperature: 0.7,
       max_tokens: 2048,
-      ...(expectJSON ? { response_format: { type: 'json_object' } } : {}),
-      ...(this.webSearchEnabled ? {
+      ...((expectJSON && !isRetry) ? { response_format: { type: 'json_object' } } : {}),
+      ...((this.webSearchEnabled && !isRetry) ? {
         tools: [
           { type: 'openrouter:web_search' }
         ]
@@ -415,6 +410,12 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
           errorMsg = errJson.error?.message || errorMsg;
         } catch (e) {}
 
+        // If error is 400 and we passed tools or response_format, auto-retry without them!
+        if (res.status === 400 && !isRetry && (this.webSearchEnabled || expectJSON)) {
+          console.warn(`[OpenRouter] Model ${model} returned 400 on tools/response_format. Auto-retrying cleanly...`);
+          return this.callOpenRouter(prompt, expectJSON, callType, true);
+        }
+
         this.addLog({
           type: callType,
           provider: 'OpenRouter',
@@ -439,7 +440,7 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
       if (!content) throw new Error('Empty response from OpenRouter API');
 
       let parsedJSON = null;
-      try { parsedJSON = JSON.parse(content); } catch(e) {}
+      try { parsedJSON = this.cleanAndParseJSON(content); } catch(e) {}
 
       this.addLog({
         type: callType,
@@ -478,33 +479,39 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
     }
   }
 
-  // JSON Extraction helper
+  // Robust JSON Extraction helper
   cleanAndParseJSON(rawText) {
     if (!rawText) return null;
     let cleaned = rawText.trim();
-    // Remove markdown code fences if present
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.substring(7);
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.substring(3);
-    }
-    if (cleaned.endsWith('```')) {
-      cleaned = cleaned.substring(0, cleaned.length - 3);
-    }
-    cleaned = cleaned.trim();
 
+    // 1. If wrapped in markdown code fence (```json ... ``` or ``` ...)
+    const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      cleaned = codeBlockMatch[1].trim();
+    }
+
+    // 2. Direct parse attempt
     try {
       return JSON.parse(cleaned);
-    } catch (e) {
-      // Attempt substring between first { and last }
-      const firstBrace = cleaned.indexOf('{');
-      const lastBrace = cleaned.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const sliced = cleaned.substring(firstBrace, lastBrace + 1);
-        return JSON.parse(sliced);
+    } catch (e) {}
+
+    // 3. Extract JSON between the outermost { and }
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = cleaned.substring(firstBrace, lastBrace + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch (e2) {
+        // Try fixing simple trailing commas before closing braces
+        try {
+          const sanitized = candidate.replace(/,\s*([\]}])/g, '$1');
+          return JSON.parse(sanitized);
+        } catch (e3) {}
       }
-      throw e;
     }
+
+    return null;
   }
 
   // Mock Plan Generator (for offline / demo testing before entering key)
@@ -547,30 +554,84 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
     };
   }
 
-  // Mock Batch Generator (for offline / instant preview)
+  // Dynamic Mock Batch Generator (with varied question types and unique options)
   getMockBatch(topic, plan, batchNumber, count = 5) {
     const modules = plan.modules || [{ title: topic }];
     const questions = [];
 
+    const questionTemplates = [
+      {
+        q: (t, m) => `What is the core purpose of ${m.title} when mastering ${t}?`,
+        opts: (t, m) => [
+          `Establishing robust mental models and standardizing core operations across the system.`,
+          `Bypassing data validation layers to maximize raw throughput at any cost.`,
+          `Enforcing strict monolithic dependencies to prevent horizontal distributed scaling.`,
+          `Disabling asynchronous processing in favor of blocking thread execution.`
+        ],
+        ans: 0,
+        exp: (t, m) => `In ${t}, mastering ${m.title} provides the foundational architectural guarantees necessary for scalable and predictable execution.`
+      },
+      {
+        q: (t, m) => `Which strategy best prevents performance bottlenecks in ${m.title}?`,
+        opts: (t, m) => [
+          `Allocating unbounded global memory without garbage collection constraints.`,
+          `Implementing intelligent caching, backpressure, and asynchronous decoupled workflows.`,
+          `Polling state synchronously in an infinite tight loop without timeouts.`,
+          `Hardcoding static thread pools with no elasticity or circuit breakers.`
+        ],
+        ans: 1,
+        exp: (t, m) => `Decoupling workloads with caching, backpressure, and non-blocking I/O is critical to avoid single-point bottlenecks.`
+      },
+      {
+        q: (t, m) => `What is a critical anti-pattern to avoid when implementing ${m.title}?`,
+        opts: (t, m) => [
+          `Writing automated integration tests for edge-case boundaries.`,
+          `Leveraging declarative configuration pipelines and observability metrics.`,
+          `Tightly coupling distributed components and ignoring transient network partition failures.`,
+          `Utilizing exponential backoff and idempotency keys for distributed retries.`
+        ],
+        ans: 2,
+        exp: (t, m) => `Assuming network reliability and tightly coupling micro-components creates cascading failures in modern distributed systems.`
+      },
+      {
+        q: (t, m) => `How does modern production architecture handle state in ${m.title}?`,
+        opts: (t, m) => [
+          `Storing all persistent state inside volatile in-memory container registers.`,
+          `Relying on synchronous file locks across multi-region server clusters.`,
+          `Writing unindexed raw log files to disk on every single user interaction.`,
+          `Employing event-driven state streams with immutable logs and snapshot checkpointing.`
+        ],
+        ans: 3,
+        exp: (t, m) => `Immutable event logs combined with snapshot checkpointing ensure reliable recovery, replayability, and horizontal audit trails.`
+      },
+      {
+        q: (t, m) => `When scaling ${m.title} under high concurrency, what trade-off must be evaluated?`,
+        opts: (t, m) => [
+          `Trading off immediate strong consistency for high availability and low latency.`,
+          `Sacrificing security encryption to gain minimal CPU instruction savings.`,
+          `Replacing distributed caches with synchronous relational database locking.`,
+          `Eliminating load balancers to route all traffic to a single leader node.`
+        ],
+        ans: 0,
+        exp: (t, m) => `According to the CAP theorem and distributed systems theory, high throughput and availability often require embracing eventual consistency.`
+      }
+    ];
+
     for (let i = 0; i < count; i++) {
       const qNum = (batchNumber - 1) * count + i + 1;
       const mod = modules[i % modules.length];
+      const template = questionTemplates[i % questionTemplates.length];
 
       questions.push({
         id: `q_${batchNumber}_${i + 1}`,
         moduleIndex: i % modules.length,
         moduleTitle: mod.title,
-        question: `Question #${qNum}: In the context of ${mod.title}, what is the primary architectural trade-off?`,
-        codeSnippet: i % 2 === 1 ? `// Example execution snippet for ${topic}\nconst result = await processPipeline({ mode: "async", batch: ${qNum} });` : '',
-        options: [
-          `Prioritizing high throughput and horizontal scalability at the cost of eventual consistency.`,
-          `Sacrificing memory footprint to enforce synchronous thread-blocking execution.`,
-          `Relying exclusively on monolithic state without cache invalidation guarantees.`,
-          `Eliminating network overhead by disabling transport-layer encryption.`
-        ],
-        correctAnswerIndex: 0,
-        explanation: `In distributed and modern systems, maximizing throughput and scalability commonly requires embracing eventual consistency over strict immediate lock synchronization.`,
-        perplexityQuery: `Explain in depth the primary architectural trade-offs in ${mod.title} for ${topic}`
+        question: `[#${qNum}] ${template.q(topic, mod)}`,
+        codeSnippet: i % 2 === 1 ? `// Example ${topic} Implementation Pattern\nconst execution = await processPipeline({\n  module: "${mod.title.replace(/"/g, '')}",\n  stage: ${qNum},\n  concurrency: "adaptive"\n});` : '',
+        options: template.opts(topic, mod),
+        correctAnswerIndex: template.ans,
+        explanation: template.exp(topic, mod),
+        perplexityQuery: `Explain in detail ${template.q(topic, mod)} for ${topic}`
       });
     }
 

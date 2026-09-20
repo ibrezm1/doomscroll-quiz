@@ -83,9 +83,12 @@ class TopicHistoryManager {
         <div class="saved-topic-card" id="session_${s.id}">
           <div class="saved-topic-header">
             <span class="saved-topic-badge">${s.difficulty} • Milestone ${curMod}/${totalMods}</span>
-            <button class="delete-topic-btn" data-id="${s.id}" title="Delete Topic History">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <button class="topic-json-btn mini-action-btn" data-id="${s.id}" title="View/Edit Topic JSON" style="padding: 2px 6px; font-size: 0.68rem;">{ } JSON</button>
+              <button class="delete-topic-btn" data-id="${s.id}" title="Delete Topic History">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
           </div>
           
           <div class="saved-topic-title">${this.escape(s.topic)}</div>
@@ -115,6 +118,14 @@ class TopicHistoryManager {
       });
     });
 
+    container.querySelectorAll('.topic-json-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        this.openJsonEditor(id);
+      });
+    });
+
     container.querySelectorAll('.delete-topic-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -122,6 +133,124 @@ class TopicHistoryManager {
         this.deleteSession(id);
         this.renderPromptList(container, countBadge);
       });
+    });
+  }
+
+  openJsonEditor(specificSessionId = null) {
+    const modal = document.getElementById('topics-json-modal');
+    const input = document.getElementById('topics-json-input');
+    const errBox = document.getElementById('topics-json-error');
+    if (!modal || !input) return;
+
+    const list = this.getAll();
+    let displayData = list;
+    if (specificSessionId) {
+      const single = list.find(s => s.id === specificSessionId);
+      if (single) displayData = [single];
+    }
+
+    input.value = JSON.stringify(displayData, null, 2);
+    if (errBox) errBox.style.display = 'none';
+    modal.classList.add('active');
+    this.bindModalEvents();
+  }
+
+  bindModalEvents() {
+    if (this.modalBound) return;
+    this.modalBound = true;
+
+    const modal = document.getElementById('topics-json-modal');
+    const input = document.getElementById('topics-json-input');
+    const errBox = document.getElementById('topics-json-error');
+    const closeBtn = document.getElementById('close-topics-json-btn');
+    const cancelBtn = document.getElementById('cancel-topics-json-btn');
+    const saveBtn = document.getElementById('save-topics-json-btn');
+    const formatBtn = document.getElementById('topics-json-format-btn');
+    const copyBtn = document.getElementById('topics-json-copy-btn');
+    const sampleBtn = document.getElementById('topics-json-sample-btn');
+
+    const closeModal = () => modal?.classList.remove('active');
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+
+    formatBtn?.addEventListener('click', () => {
+      try {
+        const parsed = JSON.parse(input.value || '[]');
+        input.value = JSON.stringify(parsed, null, 2);
+        if (errBox) errBox.style.display = 'none';
+        if (window.showToast) window.showToast('JSON Formatted! ✨');
+      } catch (e) {
+        if (errBox) {
+          errBox.style.display = 'block';
+          errBox.textContent = `JSON Error: ${e.message}`;
+        }
+      }
+    });
+
+    copyBtn?.addEventListener('click', () => {
+      navigator.clipboard.writeText(input.value).then(() => {
+        if (window.showToast) window.showToast('Topics JSON Copied! 📋');
+      });
+    });
+
+    sampleBtn?.addEventListener('click', () => {
+      const sample = [
+        {
+          id: `topic_${Date.now()}`,
+          topic: "Kubernetes & Microservices Architecture",
+          difficulty: "Intermediate",
+          plan: {
+            topic: "Kubernetes & Microservices Architecture",
+            difficulty: "Intermediate",
+            title: "Mastering Kubernetes & Microservices Architecture",
+            summary: "Core principles of container orchestration and cluster design.",
+            modules: [
+              { id: 1, title: "Pods, Nodes & Core Objects", summary: "Declarative manifests & deployments", keyConcepts: ["Pods", "Deployments"], targetQuestions: 4 },
+              { id: 2, title: "Services & Ingress Networking", summary: "ClusterIP, NodePort, LoadBalancer", keyConcepts: ["Services", "Ingress"], targetQuestions: 4 }
+            ]
+          },
+          questions: [],
+          score: 150,
+          streak: 3,
+          maxStreak: 3,
+          currentModuleIndex: 0,
+          moduleQuestionsGenerated: 0,
+          updatedAt: Date.now()
+        }
+      ];
+      input.value = JSON.stringify(sample, null, 2);
+      if (errBox) errBox.style.display = 'none';
+      if (window.showToast) window.showToast('Sample Topic Loaded! 📥');
+    });
+
+    saveBtn?.addEventListener('click', () => {
+      const raw = input.value.trim();
+      try {
+        let parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          if (parsed && typeof parsed === 'object' && parsed.topic) {
+            parsed = [parsed];
+          } else {
+            throw new Error('Root must be an array of topic objects [ { topic: "...", plan: {...} } ]');
+          }
+        }
+
+        parsed.forEach((t, i) => {
+          if (!t.topic) throw new Error(`Item #${i + 1} is missing a "topic" string`);
+          if (!t.id) t.id = `topic_${Date.now()}_${i}`;
+          if (!t.updatedAt) t.updatedAt = Date.now();
+        });
+
+        localStorage.setItem(this.storageKey, JSON.stringify(parsed));
+        window.dispatchEvent(new CustomEvent('ds_topics_updated'));
+        closeModal();
+        if (window.showToast) window.showToast('Saved topics database updated! ✓');
+      } catch (err) {
+        if (errBox) {
+          errBox.style.display = 'block';
+          errBox.textContent = err.message;
+        }
+      }
     });
   }
 

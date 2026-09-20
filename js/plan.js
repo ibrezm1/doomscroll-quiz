@@ -74,6 +74,21 @@ class PlanManager {
       });
     });
 
+    jsonInput?.addEventListener('input', () => {
+      const raw = jsonInput.value.trim();
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.modules) && parsed.modules.length > 0) {
+          this.currentPlan = parsed;
+          this.clearJsonError();
+        }
+      } catch (e) {
+        // live syntax feedback
+        this.showJsonError(`Syntax Error: ${e.message}`);
+      }
+    });
+
     applyBtn?.addEventListener('click', () => {
       this.applyJsonChanges(true);
     });

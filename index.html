@@ -112,9 +112,14 @@
 
         <!-- Saved / Past Learning Topics (Pick Up Where You Left Off) -->
         <div class="saved-topics-section" id="saved-topics-container" style="display: none; margin-bottom: 20px;">
-          <div class="section-title-row">
-            <span class="preset-title" style="color: #c4b5fd;">📚 Continue Past Topics</span>
-            <span class="saved-count-badge" id="saved-topics-count">0</span>
+          <div class="section-title-row" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="preset-title" style="color: #c4b5fd;">📚 Continue Past Topics</span>
+              <span class="saved-count-badge" id="saved-topics-count">0</span>
+            </div>
+            <button class="mini-action-btn" id="edit-topics-json-btn" title="View & Edit Saved Topics as JSON" style="display: flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 0.75rem;">
+              <span>{ } Edit JSON</span>
+            </button>
           </div>
           <div class="saved-topics-list" id="saved-topics-list">
             <!-- Dynamically populated from localStorage by js/history.js -->
@@ -350,6 +355,41 @@
         <!-- Logs Stream Container -->
         <div class="logs-feed" id="logs-list">
           <!-- Dynamically populated by js/app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         SAVED TOPICS JSON DATABASE & IMPORTER MODAL
+         ==================================================================== -->
+    <div class="modal-overlay" id="topics-json-modal">
+      <div class="modal-sheet" style="max-height: 90dvh;">
+        <div class="modal-handle"></div>
+        <div class="modal-header" style="margin-bottom: 12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.15rem;">📁</span>
+            <h3 class="modal-title">Saved Topics JSON Database</h3>
+          </div>
+          <button class="plan-action-btn" id="close-topics-json-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="plan-json-toolbar" style="margin-bottom: 8px;">
+          <span class="plan-json-label">Topics Database Array:</span>
+          <div style="display:flex; gap:6px;">
+            <button class="mini-action-btn" id="topics-json-format-btn" title="Prettify JSON">✨ Format</button>
+            <button class="mini-action-btn" id="topics-json-copy-btn" title="Copy JSON">📋 Copy</button>
+            <button class="mini-action-btn" id="topics-json-sample-btn" title="Load Sample Topic">📥 Sample</button>
+          </div>
+        </div>
+
+        <textarea class="plan-json-textarea" id="topics-json-input" style="height: 320px;" spellcheck="false" placeholder="[ { topic: '...', plan: {...}, questions: [...] } ]"></textarea>
+        <div class="plan-json-error" id="topics-json-error" style="display: none;"></div>
+
+        <div style="display:flex; gap:10px; margin-top: 12px;">
+          <button class="secondary-btn" id="cancel-topics-json-btn" style="flex:1;">Cancel</button>
+          <button class="primary-btn" id="save-topics-json-btn" style="flex:2;">Save & Apply Changes ✓</button>
         </div>
       </div>
     </div>

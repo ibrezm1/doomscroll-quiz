@@ -166,6 +166,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.topicHistoryManager?.renderPromptList(container, countBadge);
   }
 
+  const editTopicsJsonBtn = document.getElementById('edit-topics-json-btn');
+  editTopicsJsonBtn?.addEventListener('click', () => {
+    window.topicHistoryManager?.openJsonEditor();
+  });
+
   window.addEventListener('ds_topics_updated', refreshSavedTopics);
 
   regenPlanBtn?.addEventListener('click', () => {

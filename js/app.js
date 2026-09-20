@@ -211,6 +211,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (openRouterModelSelect) {
+    openRouterModelSelect.addEventListener('change', (e) => {
+      if (e.target.value) {
+        window.aiService.openRouterModel = e.target.value;
+      }
+    });
+  }
+
   if (pickTopFreeBtn) {
     pickTopFreeBtn.addEventListener('click', () => {
       // Find top free gemini or llama or deepseek

@@ -63,10 +63,8 @@ class AIService {
 
     try {
       const res = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: {
-          'HTTP-Referer': window.location.origin || 'http://localhost',
-          'X-Title': 'DeepScroll Quiz'
-        }
+        method: 'GET',
+        mode: 'cors'
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status} fetching models`);
@@ -287,9 +285,7 @@ Return ONLY a valid JSON object matching this exact structure with NO surroundin
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.openRouterKey}`,
-        'HTTP-Referer': window.location.origin || 'http://localhost',
-        'X-Title': 'DeepScroll Quiz'
+        'Authorization': `Bearer ${this.openRouterKey}`
       },
       body: JSON.stringify(body)
     });

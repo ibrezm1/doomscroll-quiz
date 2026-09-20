@@ -1,0 +1,18 @@
+{
+  "name": "DeepScroll Quiz",
+  "short_name": "DeepScroll",
+  "description": "Infinite AI Doomscrolling Quiz for Hyper-Learning",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07080d",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

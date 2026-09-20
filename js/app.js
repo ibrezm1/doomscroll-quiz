@@ -1,0 +1,344 @@
+// ==========================================================================
+// DeepScroll App Controller - Navigation, Settings, and Flow Management
+// ==========================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Elements
+  const screenPrompt = document.getElementById('screen-prompt');
+  const screenPlan = document.getElementById('screen-plan');
+  const screenQuiz = document.getElementById('screen-quiz');
+  const topHud = document.getElementById('top-hud');
+  
+  // Prompt Elements
+  const topicInput = document.getElementById('topic-input');
+  const generatePlanBtn = document.getElementById('generate-plan-btn');
+  const difficultyChips = document.querySelectorAll('.difficulty-chip');
+  const presetPills = document.querySelectorAll('.preset-pill');
+
+  // Plan Elements
+  const planList = document.getElementById('plan-list');
+  const addModuleBtn = document.getElementById('add-module-btn');
+  const startQuizBtn = document.getElementById('start-quiz-btn');
+  const regenPlanBtn = document.getElementById('regen-plan-btn');
+
+  // Settings Modal Elements
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsModal = document.getElementById('settings-modal');
+  const closeSettingsBtn = document.getElementById('close-settings-btn');
+  const saveSettingsBtn = document.getElementById('save-settings-btn');
+  const testConnBtn = document.getElementById('test-conn-btn');
+  const testStatus = document.getElementById('test-status');
+
+  const tabGemini = document.getElementById('tab-gemini');
+  const tabOpenRouter = document.getElementById('tab-openrouter');
+  const geminiFields = document.getElementById('gemini-fields');
+  const openRouterFields = document.getElementById('openrouter-fields');
+
+  const geminiKeyInput = document.getElementById('gemini-key-input');
+  const geminiModelSelect = document.getElementById('gemini-model-select');
+  const openRouterKeyInput = document.getElementById('openrouter-key-input');
+  const openRouterModelSelect = document.getElementById('openrouter-model-select');
+
+  // Audio Toggle
+  const audioBtn = document.getElementById('audio-btn');
+  const audioIcon = document.getElementById('audio-icon');
+
+  // Bookmarks Modal
+  const bookmarkHudBtn = document.getElementById('bookmark-hud-btn');
+  const bookmarksModal = document.getElementById('bookmarks-modal');
+  const closeBookmarksBtn = document.getElementById('close-bookmarks-btn');
+  const bookmarksList = document.getElementById('bookmarks-list');
+
+  // State
+  let currentDifficulty = 'Intermediate';
+  let activeTopic = '';
+
+  // Initialize Engines
+  window.planManager.init(planList);
+  window.quizEngine.init(document.getElementById('quiz-feed'));
+
+  // Toast Function
+  window.showToast = function(msg) {
+    let toast = document.getElementById('global-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'global-toast';
+      toast.className = 'toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2800);
+  };
+
+  // Screen Switching
+  function showScreen(screenId) {
+    [screenPrompt, screenPlan, screenQuiz].forEach(screen => {
+      screen.classList.remove('active');
+    });
+
+    const target = document.getElementById(screenId);
+    if (target) {
+      target.classList.add('active');
+    }
+
+    if (screenId === 'screen-quiz') {
+      topHud.style.display = 'flex';
+    } else {
+      topHud.style.display = 'flex';
+    }
+  }
+
+  // Load Saved Settings into Inputs
+  function loadSettings() {
+    geminiKeyInput.value = window.aiService.geminiKey;
+    geminiModelSelect.value = window.aiService.geminiModel;
+    openRouterKeyInput.value = window.aiService.openRouterKey;
+    openRouterModelSelect.value = window.aiService.openRouterModel;
+
+    setProviderTab(window.aiService.provider);
+    updateAudioIcon();
+  }
+
+  function setProviderTab(provider) {
+    if (provider === 'gemini') {
+      tabGemini.classList.add('active');
+      tabOpenRouter.classList.remove('active');
+      geminiFields.style.display = 'block';
+      openRouterFields.style.display = 'none';
+    } else {
+      tabOpenRouter.classList.add('active');
+      tabGemini.classList.remove('active');
+      geminiFields.style.display = 'none';
+      openRouterFields.style.display = 'block';
+    }
+  }
+
+  function updateAudioIcon() {
+    if (window.soundEngine.muted) {
+      audioIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>`;
+    } else {
+      audioIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>`;
+    }
+  }
+
+  // Event Listeners for Provider Tabs
+  tabGemini.addEventListener('click', () => setProviderTab('gemini'));
+  tabOpenRouter.addEventListener('click', () => setProviderTab('openrouter'));
+
+  // Settings Open/Close
+  settingsBtn.addEventListener('click', () => {
+    loadSettings();
+    testStatus.style.display = 'none';
+    settingsModal.classList.add('active');
+  });
+
+  closeSettingsBtn.addEventListener('click', () => {
+    settingsModal.classList.remove('active');
+  });
+
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) settingsModal.classList.remove('active');
+  });
+
+  // Save Settings
+  saveSettingsBtn.addEventListener('click', () => {
+    const activeTab = tabGemini.classList.contains('active') ? 'gemini' : 'openrouter';
+    window.aiService.saveConfig({
+      provider: activeTab,
+      geminiKey: geminiKeyInput.value,
+      geminiModel: geminiModelSelect.value,
+      openRouterKey: openRouterKeyInput.value,
+      openRouterModel: openRouterModelSelect.value
+    });
+    settingsModal.classList.remove('active');
+    window.showToast('API Settings Saved! ⚡');
+  });
+
+  // Test Connection
+  testConnBtn.addEventListener('click', async () => {
+    const activeTab = tabGemini.classList.contains('active') ? 'gemini' : 'openrouter';
+    window.aiService.saveConfig({
+      provider: activeTab,
+      geminiKey: geminiKeyInput.value,
+      geminiModel: geminiModelSelect.value,
+      openRouterKey: openRouterKeyInput.value,
+      openRouterModel: openRouterModelSelect.value
+    });
+
+    testConnBtn.disabled = true;
+    testConnBtn.textContent = 'Testing...';
+    testStatus.style.display = 'none';
+
+    try {
+      await window.aiService.testConnection();
+      testStatus.className = 'test-status success';
+      testStatus.textContent = '✓ Successfully connected to ' + (activeTab === 'gemini' ? 'Google Gemini' : 'OpenRouter');
+    } catch (err) {
+      testStatus.className = 'test-status error';
+      testStatus.textContent = '✗ ' + (err.message || 'Connection failed');
+    } finally {
+      testConnBtn.disabled = false;
+      testConnBtn.textContent = 'Test Connection';
+    }
+  });
+
+  // Difficulty Chips
+  difficultyChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      difficultyChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentDifficulty = chip.dataset.level;
+      if (window.soundEngine) window.soundEngine.playTap();
+    });
+  });
+
+  // Presets
+  presetPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      topicInput.value = pill.textContent;
+      if (window.soundEngine) window.soundEngine.playTap();
+    });
+  });
+
+  // Audio Toggle
+  audioBtn.addEventListener('click', () => {
+    window.soundEngine.toggleMute();
+    updateAudioIcon();
+  });
+
+  // Generate Plan Trigger
+  async function handleGeneratePlan() {
+    const topic = topicInput.value.trim();
+    if (!topic) {
+      window.showToast('Please enter a topic to learn');
+      topicInput.focus();
+      return;
+    }
+
+    activeTopic = topic;
+    generatePlanBtn.disabled = true;
+    generatePlanBtn.innerHTML = `
+      <div class="spinner" style="width:20px;height:20px;border-width:2px;"></div>
+      Generating Learning Plan...
+    `;
+
+    try {
+      const plan = await window.aiService.generateLearningPlan(topic, currentDifficulty);
+      window.planManager.setPlan(plan);
+      showScreen('screen-plan');
+    } catch (err) {
+      window.showToast('Failed to generate plan: ' + err.message);
+    } finally {
+      generatePlanBtn.disabled = false;
+      generatePlanBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+        Generate Learning Plan
+      `;
+    }
+  }
+
+  generatePlanBtn.addEventListener('click', handleGeneratePlan);
+  topicInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleGeneratePlan();
+    }
+  });
+
+  // Plan Screen Actions
+  addModuleBtn.addEventListener('click', () => {
+    window.planManager.addModule();
+  });
+
+  regenPlanBtn.addEventListener('click', () => {
+    showScreen('screen-prompt');
+  });
+
+  startQuizBtn.addEventListener('click', () => {
+    const finalPlan = window.planManager.getPlan();
+    if (!finalPlan || !finalPlan.modules || finalPlan.modules.length === 0) {
+      window.showToast('Please add at least 1 milestone');
+      return;
+    }
+
+    if (window.soundEngine) window.soundEngine.playTap();
+    showScreen('screen-quiz');
+    window.quizEngine.startQuiz(activeTopic, finalPlan);
+  });
+
+  // Bookmarks Modal
+  bookmarkHudBtn.addEventListener('click', () => {
+    renderBookmarksList();
+    bookmarksModal.classList.add('active');
+  });
+
+  closeBookmarksBtn.addEventListener('click', () => {
+    bookmarksModal.classList.remove('active');
+  });
+
+  bookmarksModal.addEventListener('click', (e) => {
+    if (e.target === bookmarksModal) bookmarksModal.classList.remove('active');
+  });
+
+  function renderBookmarksList() {
+    const bookmarks = window.quizEngine.bookmarkedQuestions;
+    if (!bookmarks || bookmarks.length === 0) {
+      bookmarksList.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 40px 10px;">
+          <div style="font-size: 2rem; margin-bottom: 8px;">📑</div>
+          <div style="font-weight: 700;">No saved questions yet</div>
+          <div style="font-size: 0.8rem; margin-top: 4px;">Tap the bookmark icon on any card during the quiz to save it here.</div>
+        </div>
+      `;
+      return;
+    }
+
+    bookmarksList.innerHTML = bookmarks.map((b, idx) => {
+      const perplexityUrl = window.quizEngine.getPerplexityUrl(b);
+      return `
+        <div class="plan-item" style="flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+            <span class="module-tag">${b.moduleTitle || 'Review'}</span>
+            <button class="plan-action-btn delete-bookmark-btn" data-index="${idx}" title="Remove">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <div style="font-weight: 700; font-size: 0.92rem; color: #fff;">${b.question}</div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary);">${b.explanation}</div>
+          <a href="${perplexityUrl}" target="_blank" rel="noopener noreferrer" class="perplexity-btn" style="padding: 8px 12px; margin-top: 4px;">
+            Ask Perplexity Deep Dive ↗
+          </a>
+        </div>
+      `;
+    }).join('');
+
+    // Attach remove listeners
+    const deleteBtns = bookmarksList.querySelectorAll('.delete-bookmark-btn');
+    deleteBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(btn.dataset.index, 10);
+        window.quizEngine.bookmarkedQuestions.splice(idx, 1);
+        localStorage.setItem('ds_bookmarks', JSON.stringify(window.quizEngine.bookmarkedQuestions));
+        renderBookmarksList();
+      });
+    });
+  }
+
+  // Keyboard navigation for testing (Arrow Up / Down)
+  window.addEventListener('keydown', (e) => {
+    if (screenQuiz.classList.contains('active')) {
+      const feed = document.getElementById('quiz-feed');
+      if (e.key === 'ArrowDown') {
+        feed.scrollBy({ top: window.innerHeight * 0.9, behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        feed.scrollBy({ top: -window.innerHeight * 0.9, behavior: 'smooth' });
+      }
+    }
+  });
+
+  // Initial setup check
+  loadSettings();
+});

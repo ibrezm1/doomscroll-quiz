@@ -1307,12 +1307,20 @@ html, body {
 }
 
 .test-status {
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: var(--radius-sm);
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 500;
   display: none;
   margin-top: 10px;
+  animation: slideUpFade 0.2s ease forwards;
+}
+
+.test-status.loading {
+  display: block;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #c4b5fd;
 }
 
 .test-status.success {

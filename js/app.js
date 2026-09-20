@@ -299,31 +299,66 @@ document.addEventListener('DOMContentLoaded', () => {
     window.showToast('API Settings Saved! ⚡');
   });
 
-  // Test Connection
+  // Test Connection with Detailed Status Feedback
   testConnBtn.addEventListener('click', async () => {
     const activeTab = tabGemini.classList.contains('active') ? 'gemini' : 'openrouter';
+    const chosenModel = activeTab === 'gemini' ? geminiModelSelect.value : openRouterModelSelect.value;
+    
     window.aiService.saveConfig({
       provider: activeTab,
       geminiKey: geminiKeyInput.value,
       geminiModel: geminiModelSelect.value,
       openRouterKey: openRouterKeyInput.value,
-      openRouterModel: openRouterModelSelect.value
+      openRouterModel: openRouterModelSelect.value,
+      webSearchEnabled: webSearchToggle ? webSearchToggle.checked : false
     });
 
     testConnBtn.disabled = true;
-    testConnBtn.textContent = 'Testing...';
-    testStatus.style.display = 'none';
+    testConnBtn.innerHTML = `
+      <span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px;"></span>
+      Testing ${activeTab === 'gemini' ? 'Gemini' : 'OpenRouter'}...
+    `;
+    
+    testStatus.style.display = 'block';
+    testStatus.className = 'test-status loading';
+    testStatus.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
+        <span>Pinging ${activeTab === 'gemini' ? 'Google Gemini' : 'OpenRouter'} (${chosenModel})...</span>
+      </div>
+    `;
 
     try {
-      await window.aiService.testConnection();
+      const res = await window.aiService.testConnection();
       testStatus.className = 'test-status success';
-      testStatus.textContent = '✓ Successfully connected to ' + (activeTab === 'gemini' ? 'Google Gemini' : 'OpenRouter');
+      testStatus.innerHTML = `
+        <div style="font-weight: 800; font-size: 0.88rem; margin-bottom: 4px; display:flex; align-items:center; gap:6px;">
+          <span>✓</span>
+          <span>Connection Verified!</span>
+        </div>
+        <div style="font-size: 0.78rem; opacity: 0.9; line-height: 1.4;">
+          <div>• <strong>Provider:</strong> ${res.provider}</div>
+          <div>• <strong>Model:</strong> ${res.model}</div>
+          <div>• <strong>Latency:</strong> ${res.latency} ms ⚡</div>
+          <div>• <strong>Status:</strong> Ready for Quiz Doomscrolling</div>
+        </div>
+      `;
+      if (window.soundEngine) window.soundEngine.playCorrect();
     } catch (err) {
       testStatus.className = 'test-status error';
-      testStatus.textContent = '✗ ' + (err.message || 'Connection failed');
+      testStatus.innerHTML = `
+        <div style="font-weight: 800; font-size: 0.88rem; margin-bottom: 4px; display:flex; align-items:center; gap:6px;">
+          <span>✗</span>
+          <span>Connection Failed</span>
+        </div>
+        <div style="font-size: 0.78rem; opacity: 0.95; line-height: 1.4;">
+          ${err.message || 'Could not verify connection. Please check your API key and network.'}
+        </div>
+      `;
+      if (window.soundEngine) window.soundEngine.playIncorrect();
     } finally {
       testConnBtn.disabled = false;
-      testConnBtn.textContent = 'Test Connection';
+      testConnBtn.innerHTML = `<span>Test Connection</span>`;
     }
   });
 

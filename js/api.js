@@ -53,11 +53,28 @@ class AIService {
     return !!(key && key.length > 5);
   }
 
-  // Test API Connection
+  // Test API Connection with Key Validation and Latency Measurement
   async testConnection() {
+    const activeKey = this.getActiveKey();
+    const activeModel = this.getActiveModel();
+    const providerName = this.provider === 'gemini' ? 'Google Gemini' : 'OpenRouter';
+
+    if (!activeKey || activeKey.trim().length < 3) {
+      throw new Error(`Missing ${providerName} API Key. Please paste your key in the field above.`);
+    }
+
+    const startTime = performance.now();
     const prompt = 'Respond with JSON: {"status": "ok", "message": "connected"}';
     const result = await this.callAI(prompt, true);
-    return result;
+    const latencyMs = Math.round(performance.now() - startTime);
+
+    return {
+      status: 'ok',
+      provider: providerName,
+      model: activeModel,
+      latency: latencyMs,
+      raw: result
+    };
   }
 
   // Fetch OpenRouter Live Models with Free Model Detection

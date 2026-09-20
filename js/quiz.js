@@ -57,10 +57,9 @@ class QuizEngine {
       topicPill.textContent = `[${modNum}/${totalMods}] ${qData.moduleTitle || this.topic}`;
     }
 
-    const isNearEnd = (index >= this.questions.length - 2);
-    const isFourthCard = ((index + 1) % 5 === 4);
+    const isNearEnd = (index >= this.questions.length - 1);
 
-    if ((isFourthCard || isNearEnd) && !this.isFetchingNextBatch) {
+    if (isNearEnd && !this.isFetchingNextBatch) {
       this.fetchNextBatch();
     }
   }
@@ -175,19 +174,19 @@ class QuizEngine {
     this.isFetchingNextBatch = true;
     this.batchIndex += 1;
 
-    const modules = this.plan?.modules || [{ title: this.topic, targetQuestions: 5 }];
+    const modules = this.plan?.modules || [{ title: this.topic, targetQuestions: 4 }];
     const totalModules = modules.length;
 
     let currentModule = null;
-    let targetCount = 5;
+    let targetCount = 2;
 
     if (this.currentModuleIndex >= totalModules) {
-      currentModule = { title: `Capstone Review & Mastery`, summary: `Mixed review across ${this.topic}`, targetQuestions: 5 };
-      targetCount = 5;
+      currentModule = { title: `Capstone Review & Mastery`, summary: `Mixed review across ${this.topic}`, targetQuestions: 4 };
+      targetCount = 2;
     } else {
       currentModule = modules[this.currentModuleIndex];
-      const remaining = (currentModule.targetQuestions || 5) - this.moduleQuestionsGenerated;
-      targetCount = Math.min(5, Math.max(1, remaining));
+      const remaining = (currentModule.targetQuestions || 4) - this.moduleQuestionsGenerated;
+      targetCount = Math.min(2, Math.max(1, remaining));
     }
 
     try {

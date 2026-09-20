@@ -101,13 +101,14 @@ Return ONLY JSON:
   ]
 }`;
 
-    const response = await this.callAI(prompt, true, `PLAN_GEN: ${topic}`);
+    const planSchema = window.DeepScrollSchemas?.planSchema || null;
+    const response = await this.callAI(prompt, true, `PLAN_GEN: ${topic}`, planSchema);
     const parsed = this.cleanAndParseJSON(response);
     if (parsed && Array.isArray(parsed.modules) && parsed.modules.length > 0) return parsed;
     throw new Error('AI returned an unexpected plan format. Please try again.');
   }
 
-  async generateTopicBatch(topic, currentModule, moduleIndex, totalModules, count = 5, previousQuestions = []) {
+  async generateTopicBatch(topic, currentModule, moduleIndex, totalModules, count = 2, previousQuestions = []) {
     if (!this.hasValidKey()) throw new Error(`Please add your API key in Settings (⚙️).`);
 
     const prevList = previousQuestions.slice(-10).map(q => `- ${q.question}`).join('\n');
@@ -146,35 +147,59 @@ Return ONLY JSON:
   ]
 }`;
 
-    const response = await this.callAI(prompt, true, `TOPIC [${moduleIndex + 1}/${totalModules}]: ${currentModule.title}`);
+    const questionsSchema = window.DeepScrollSchemas?.topicQuestionsSchema || null;
+    const response = await this.callAI(prompt, true, `TOPIC [${moduleIndex + 1}/${totalModules}]: ${currentModule.title}`, questionsSchema);
     const parsed = this.cleanAndParseJSON(response);
 
     let rawQuestions = null;
     if (Array.isArray(parsed)) {
       rawQuestions = parsed;
     } else if (parsed && typeof parsed === 'object') {
-      rawQuestions = parsed.questions || parsed.items || parsed.quiz || parsed.cards || null;
+      rawQuestions = parsed.questions || parsed.items || parsed.quiz || parsed.cards || parsed.data || null;
+      if (!rawQuestions && parsed.question && (parsed.options || parsed.choices)) {
+        rawQuestions = [parsed];
+      }
+      if (!rawQuestions) {
+        const vals = Object.values(parsed).filter(v => v && typeof v === 'object' && (v.question || v.options));
+        if (vals.length > 0) rawQuestions = vals;
+      }
     }
 
     if (Array.isArray(rawQuestions) && rawQuestions.length > 0) {
-      return rawQuestions.map((q, idx) => ({
-        id: q.id || `q_mod${moduleIndex + 1}_${Date.now()}_${idx + 1}`,
-        moduleIndex: moduleIndex,
-        moduleTitle: currentModule.title,
-        topicTargetQuestions: currentModule.targetQuestions || 5,
-        question: q.question || `Key principle in ${currentModule.title}?`,
-        codeSnippet: q.codeSnippet || '',
-        options: (Array.isArray(q.options) && q.options.length >= 2) ? q.options : ['Correct Answer', 'Alternative Choice A', 'Alternative Choice B', 'Alternative Choice C'],
-        correctAnswerIndex: (typeof q.correctAnswerIndex === 'number' && q.correctAnswerIndex >= 0 && q.correctAnswerIndex < 4) ? q.correctAnswerIndex : 0,
-        explanation: q.explanation || `Understanding ${currentModule.title} is essential for mastering this topic.`,
-        perplexityQuery: q.perplexityQuery || `Explain ${q.question || currentModule.title} in depth`
-      }));
+      return rawQuestions.map((q, idx) => {
+        let options = q.options || q.choices || q.answers || [];
+        if (!Array.isArray(options) && typeof options === 'object') options = Object.values(options);
+        if (!Array.isArray(options) || options.length < 2) options = ['Option A', 'Option B', 'Option C', 'Option D'];
+
+        let corrIdx = 0;
+        if (typeof q.correctAnswerIndex === 'number') corrIdx = q.correctAnswerIndex;
+        else if (typeof q.correct_answer_index === 'number') corrIdx = q.correct_answer_index;
+        else if (typeof q.answerIndex === 'number') corrIdx = q.answerIndex;
+        else if (typeof q.answer === 'number') corrIdx = q.answer;
+        else if (typeof q.correctAnswer === 'string') {
+          const found = options.findIndex(opt => String(opt).toLowerCase().trim() === q.correctAnswer.toLowerCase().trim());
+          if (found !== -1) corrIdx = found;
+        }
+
+        return {
+          id: q.id || `q_mod${moduleIndex + 1}_${Date.now()}_${idx + 1}`,
+          moduleIndex: moduleIndex,
+          moduleTitle: currentModule.title,
+          topicTargetQuestions: currentModule.targetQuestions || 4,
+          question: q.question || `Key principle in ${currentModule.title}?`,
+          codeSnippet: q.codeSnippet || q.code || '',
+          options: options.slice(0, 4),
+          correctAnswerIndex: (corrIdx >= 0 && corrIdx < 4) ? corrIdx : 0,
+          explanation: q.explanation || `Understanding ${currentModule.title} is essential for mastering this topic.`,
+          perplexityQuery: q.perplexityQuery || `Explain ${q.question || currentModule.title} in depth`
+        };
+      });
     }
 
     throw new Error(`AI response could not be formatted for "${currentModule.title}". Please inspect logs or retry.`);
   }
 
-  async callAI(prompt, expectJSON = false, callType = 'AI_CALL') {
+  async callAI(prompt, expectJSON = false, callType = 'AI_CALL', jsonSchema = null) {
     const logCallback = (entry) => this.addLog({ type: callType, ...entry });
 
     if (this.provider === 'gemini') {
@@ -183,6 +208,7 @@ Return ONLY JSON:
         model: this.geminiModel,
         prompt,
         expectJSON,
+        jsonSchema,
         webSearch: this.webSearchEnabled,
         logCallback
       });
@@ -192,6 +218,7 @@ Return ONLY JSON:
         model: this.openRouterModel,
         prompt,
         expectJSON,
+        jsonSchema,
         webSearch: this.webSearchEnabled,
         logCallback
       });
@@ -201,6 +228,9 @@ Return ONLY JSON:
   cleanAndParseJSON(rawText) {
     if (!rawText) return null;
     let cleaned = rawText.trim();
+    // Remove reasoning model <think>...</think> blocks
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
     const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (codeBlockMatch && codeBlockMatch[1]) cleaned = codeBlockMatch[1].trim();
 

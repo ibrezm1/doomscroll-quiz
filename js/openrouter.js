@@ -1,5 +1,5 @@
 // ==========================================================================
-// DeepScroll OpenRouter Client (Models Fetching & Chat Completions)
+// DeepScroll OpenRouter Client (Models Fetching & Structured Outputs)
 // ==========================================================================
 
 class OpenRouterClient {
@@ -53,13 +53,26 @@ class OpenRouterClient {
     ];
   }
 
-  async generateChat({ apiKey, model = 'google/gemini-2.0-flash-exp:free', prompt, expectJSON = false, webSearch = false, logCallback, isRetry = false }) {
+  async generateChat({ apiKey, model = 'google/gemini-2.0-flash-exp:free', prompt, expectJSON = false, jsonSchema = null, webSearch = false, logCallback, isRetry = false }) {
     if (!apiKey) throw new Error('OpenRouter API Key is missing. Please enter it in Settings.');
 
     const url = 'https://openrouter.ai/api/v1/chat/completions';
     const systemPrompt = expectJSON
-      ? 'You are an expert AI. You MUST respond with ONLY a raw valid JSON object. Do not wrap in markdown or backticks.'
+      ? 'You are an expert AI. You MUST respond with ONLY a raw valid JSON object matching the requested schema. Do not wrap in markdown or backticks.'
       : 'You are a helpful AI assistant.';
+
+    // Construct response_format for Structured Outputs
+    let responseFormat = undefined;
+    if (expectJSON && !isRetry) {
+      if (jsonSchema) {
+        responseFormat = {
+          type: 'json_schema',
+          json_schema: jsonSchema
+        };
+      } else {
+        responseFormat = { type: 'json_object' };
+      }
+    }
 
     const body = {
       model: model,
@@ -68,8 +81,8 @@ class OpenRouterClient {
         { role: 'user', content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 2048,
-      ...((expectJSON && !isRetry) ? { response_format: { type: 'json_object' } } : {}),
+      max_tokens: 3000,
+      ...(responseFormat ? { response_format: responseFormat } : {}),
       ...((webSearch && !isRetry) ? { tools: [{ type: 'openrouter:web_search' }] } : {})
     };
 
@@ -96,10 +109,10 @@ class OpenRouterClient {
           errorMsg = errJson.error?.message || errorMsg;
         } catch (e) {}
 
-        // Auto-retry cleanly if model doesn't support tools or json_object format (HTTP 400)
+        // Auto-retry cleanly if model doesn't support json_schema or tools (HTTP 400)
         if (res.status === 400 && !isRetry && (webSearch || expectJSON)) {
-          console.warn(`[OpenRouter] Model ${model} returned 400 on tools/response_format. Auto-retrying cleanly...`);
-          return this.generateChat({ apiKey, model, prompt, expectJSON, webSearch: false, logCallback, isRetry: true });
+          console.warn(`[OpenRouter] Model ${model} returned 400 on json_schema/tools. Auto-retrying cleanly...`);
+          return this.generateChat({ apiKey, model, prompt, expectJSON, jsonSchema: null, webSearch: false, logCallback, isRetry: true });
         }
 
         if (logCallback) {
@@ -118,8 +131,24 @@ class OpenRouterClient {
       }
 
       const data = await res.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) throw new Error('Empty response from OpenRouter API');
+      const choice = data.choices?.[0];
+      let content = choice?.message?.content;
+      if (!content && choice?.text) content = choice.text;
+      if (!content && choice?.message?.reasoning) content = choice.message.reasoning;
+      if (Array.isArray(content)) {
+        content = content.map(p => (typeof p === 'string' ? p : p.text || '')).join('\n');
+      }
+
+      if (!content) {
+        if (!isRetry && expectJSON) {
+          console.warn(`[OpenRouter] Empty content with json_schema on ${model}. Retrying in standard mode...`);
+          return this.generateChat({ apiKey, model, prompt, expectJSON, jsonSchema: null, webSearch: false, logCallback, isRetry: true });
+        }
+        throw new Error('Empty response from OpenRouter API. Please try a different model or retry.');
+      }
+
+      let parsedJSON = null;
+      try { parsedJSON = JSON.parse(content); } catch (e) {}
 
       if (logCallback) {
         logCallback({
@@ -130,7 +159,7 @@ class OpenRouterClient {
           success: true,
           latency: latency,
           request: { url: url, body: body },
-          response: { raw: data }
+          response: { parsed: parsedJSON, raw: data }
         });
       }
 

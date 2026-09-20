@@ -39,6 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const openRouterKeyInput = document.getElementById('openrouter-key-input');
   const openRouterModelSelect = document.getElementById('openrouter-model-select');
 
+  // OpenRouter Model Filter & Refresh Elements
+  const refreshOrModelsBtn = document.getElementById('refresh-or-models-btn');
+  const toggleFreeOnlyBtn = document.getElementById('toggle-free-only-btn');
+  const toggleAllModelsBtn = document.getElementById('toggle-all-models-btn');
+  const orModelSearch = document.getElementById('or-model-search');
+  const orModelCount = document.getElementById('or-model-count');
+  const pickTopFreeBtn = document.getElementById('pick-top-free-btn');
+
   // Audio Toggle
   const audioBtn = document.getElementById('audio-btn');
   const audioIcon = document.getElementById('audio-icon');
@@ -52,6 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // State
   let currentDifficulty = 'Intermediate';
   let activeTopic = '';
+  let loadedOrModels = [];
+  let isFreeOnlyFilter = true;
 
   // Initialize Engines
   window.planManager.init(planList);
@@ -96,10 +106,126 @@ document.addEventListener('DOMContentLoaded', () => {
     geminiKeyInput.value = window.aiService.geminiKey;
     geminiModelSelect.value = window.aiService.geminiModel;
     openRouterKeyInput.value = window.aiService.openRouterKey;
-    openRouterModelSelect.value = window.aiService.openRouterModel;
 
     setProviderTab(window.aiService.provider);
     updateAudioIcon();
+    loadOpenRouterModels(false);
+  }
+
+  // OpenRouter Dynamic Models Loader & Filter
+  async function loadOpenRouterModels(forceRefresh = false) {
+    if (refreshOrModelsBtn) refreshOrModelsBtn.classList.add('spinning');
+    if (orModelCount) orModelCount.textContent = 'Fetching models...';
+
+    try {
+      loadedOrModels = await window.aiService.fetchOpenRouterModels(forceRefresh);
+      renderOpenRouterModelOptions();
+      if (forceRefresh && window.showToast) {
+        window.showToast(`Updated! Loaded ${loadedOrModels.length} models.`);
+      }
+    } catch (err) {
+      console.error('Error fetching OpenRouter models:', err);
+      if (orModelCount) orModelCount.textContent = 'Error loading models';
+    } finally {
+      if (refreshOrModelsBtn) refreshOrModelsBtn.classList.remove('spinning');
+    }
+  }
+
+  function renderOpenRouterModelOptions() {
+    if (!openRouterModelSelect) return;
+
+    const searchTerm = (orModelSearch?.value || '').toLowerCase().trim();
+    const currentSelected = window.aiService.openRouterModel || 'google/gemini-2.0-flash-exp:free';
+
+    const filtered = loadedOrModels.filter(m => {
+      if (isFreeOnlyFilter && !m.isFree) return false;
+      if (searchTerm) {
+        return m.name.toLowerCase().includes(searchTerm) || m.id.toLowerCase().includes(searchTerm);
+      }
+      return true;
+    });
+
+    openRouterModelSelect.innerHTML = '';
+
+    if (filtered.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No matching models found';
+      openRouterModelSelect.appendChild(opt);
+    } else {
+      filtered.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        const tag = m.isFree ? '⚡ FREE' : '💲 PAID';
+        opt.textContent = `${tag} | ${m.name}`;
+        if (m.id === currentSelected) {
+          opt.selected = true;
+        }
+        openRouterModelSelect.appendChild(opt);
+      });
+    }
+
+    // Ensure currently selected model is present in dropdown if not in filtered list
+    if (currentSelected && !filtered.some(m => m.id === currentSelected)) {
+      const customOpt = document.createElement('option');
+      customOpt.value = currentSelected;
+      customOpt.textContent = `★ Current: ${currentSelected}`;
+      customOpt.selected = true;
+      openRouterModelSelect.prepend(customOpt);
+    }
+
+    if (orModelCount) {
+      const freeCount = loadedOrModels.filter(m => m.isFree).length;
+      orModelCount.textContent = isFreeOnlyFilter 
+        ? `Showing ${filtered.length} free models (out of ${freeCount})`
+        : `Showing ${filtered.length} of ${loadedOrModels.length} models`;
+    }
+  }
+
+  // Model Filter Event Listeners
+  if (toggleFreeOnlyBtn && toggleAllModelsBtn) {
+    toggleFreeOnlyBtn.addEventListener('click', () => {
+      isFreeOnlyFilter = true;
+      toggleFreeOnlyBtn.classList.add('active');
+      toggleAllModelsBtn.classList.remove('active');
+      renderOpenRouterModelOptions();
+    });
+
+    toggleAllModelsBtn.addEventListener('click', () => {
+      isFreeOnlyFilter = false;
+      toggleAllModelsBtn.classList.add('active');
+      toggleFreeOnlyBtn.classList.remove('active');
+      renderOpenRouterModelOptions();
+    });
+  }
+
+  if (orModelSearch) {
+    orModelSearch.addEventListener('input', () => {
+      renderOpenRouterModelOptions();
+    });
+  }
+
+  if (refreshOrModelsBtn) {
+    refreshOrModelsBtn.addEventListener('click', () => {
+      loadOpenRouterModels(true);
+    });
+  }
+
+  if (pickTopFreeBtn) {
+    pickTopFreeBtn.addEventListener('click', () => {
+      // Find top free gemini or llama or deepseek
+      const topFree = loadedOrModels.find(m => m.isFree && m.id.includes('gemini-2.0-flash')) 
+                   || loadedOrModels.find(m => m.isFree && m.id.includes('llama-3.3'))
+                   || loadedOrModels.find(m => m.isFree);
+
+      if (topFree) {
+        window.aiService.openRouterModel = topFree.id;
+        openRouterModelSelect.value = topFree.id;
+        renderOpenRouterModelOptions();
+        openRouterModelSelect.value = topFree.id;
+        if (window.showToast) window.showToast(`Selected ${topFree.name}! ⚡`);
+      }
+    });
   }
 
   function setProviderTab(provider) {
@@ -113,6 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
       tabGemini.classList.remove('active');
       geminiFields.style.display = 'none';
       openRouterFields.style.display = 'block';
+      if (loadedOrModels.length === 0) {
+        loadOpenRouterModels(false);
+      }
     }
   }
 

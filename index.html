@@ -192,17 +192,41 @@
           <div class="form-group">
             <label class="form-label">OpenRouter API Key</label>
             <input type="password" class="text-input" id="openrouter-key-input" placeholder="sk-or-v1-...">
-            <div class="helper-text">Get a key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" class="helper-link">openrouter.ai</a>.</div>
+            <div class="helper-text">Get a free key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" class="helper-link">openrouter.ai</a>.</div>
           </div>
           <div class="form-group">
-            <label class="form-label">Model</label>
+            <div class="model-header-row">
+              <label class="form-label" style="margin-bottom: 0;">OpenRouter Model</label>
+              <button class="mini-action-btn" id="refresh-or-models-btn" title="Fetch latest models from OpenRouter">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="refresh-icon"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            <!-- Model Filters Bar -->
+            <div class="model-filter-bar">
+              <button class="filter-chip active" id="toggle-free-only-btn" data-free-only="true">
+                <span class="chip-dot"></span>
+                <span>Free Models (0.00$)</span>
+              </button>
+              <button class="filter-chip" id="toggle-all-models-btn" data-free-only="false">
+                <span>All Models</span>
+              </button>
+            </div>
+
+            <!-- Quick Search Input -->
+            <div class="model-search-wrapper">
+              <input type="text" class="model-search-input" id="or-model-search" placeholder="🔍 Search models (e.g. gemini, llama, r1)...">
+            </div>
+
             <select class="select-input" id="openrouter-model-select">
-              <option value="google/gemini-2.0-flash-001">Google Gemini 2.0 Flash</option>
-              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-              <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B Instruct</option>
-              <option value="deepseek/deepseek-chat">DeepSeek V3 / Chat</option>
-              <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini</option>
+              <!-- Dynamically populated from API & cache -->
             </select>
+            
+            <div class="model-footer-row">
+              <span class="model-count-text" id="or-model-count">Loading models...</span>
+              <button class="quick-free-btn" id="pick-top-free-btn">⚡ Use Best Free Model</button>
+            </div>
           </div>
         </div>
 

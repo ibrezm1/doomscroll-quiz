@@ -8,7 +8,8 @@ class AIService {
     this.geminiKey = localStorage.getItem('ds_gemini_key') || '';
     this.openRouterKey = localStorage.getItem('ds_openrouter_key') || '';
     this.geminiModel = localStorage.getItem('ds_gemini_model') || 'gemini-2.0-flash';
-    this.openRouterModel = localStorage.getItem('ds_openrouter_model') || 'google/gemini-2.0-flash-001';
+    this.openRouterModel = localStorage.getItem('ds_openrouter_model') || 'google/gemini-2.0-flash-exp:free';
+    this.cachedOpenRouterModels = JSON.parse(localStorage.getItem('ds_cached_or_models') || '[]');
   }
 
   saveConfig({ provider, geminiKey, openRouterKey, geminiModel, openRouterModel }) {
@@ -52,6 +53,71 @@ class AIService {
     const prompt = 'Respond with JSON: {"status": "ok", "message": "connected"}';
     const result = await this.callAI(prompt, true);
     return result;
+  }
+
+  // Fetch OpenRouter Live Models with Free Model Detection
+  async fetchOpenRouterModels(forceRefresh = false) {
+    if (!forceRefresh && this.cachedOpenRouterModels && this.cachedOpenRouterModels.length > 0) {
+      return this.cachedOpenRouterModels;
+    }
+
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: {
+          'HTTP-Referer': window.location.origin || 'http://localhost',
+          'X-Title': 'DeepScroll Quiz'
+        }
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status} fetching models`);
+      const data = await res.json();
+      const rawList = data.data || [];
+
+      // Process and classify models
+      const processed = rawList.map(m => {
+        const promptPrice = parseFloat(m.pricing?.prompt || '1');
+        const completionPrice = parseFloat(m.pricing?.completion || '1');
+        const isFree = m.id.endsWith(':free') || (promptPrice === 0 && completionPrice === 0);
+        return {
+          id: m.id,
+          name: m.name || m.id,
+          contextLength: m.context_length || 0,
+          isFree: isFree,
+          description: m.description || ''
+        };
+      });
+
+      // Sort: Free models first, then alphabetical
+      processed.sort((a, b) => {
+        if (a.isFree && !b.isFree) return -1;
+        if (!a.isFree && b.isFree) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      this.cachedOpenRouterModels = processed;
+      localStorage.setItem('ds_cached_or_models', JSON.stringify(processed));
+      return processed;
+    } catch (err) {
+      console.warn('Could not fetch OpenRouter live models, returning defaults:', err);
+      if (this.cachedOpenRouterModels && this.cachedOpenRouterModels.length > 0) {
+        return this.cachedOpenRouterModels;
+      }
+      return this.getDefaultOpenRouterModels();
+    }
+  }
+
+  getDefaultOpenRouterModels() {
+    return [
+      { id: 'google/gemini-2.0-flash-exp:free', name: 'Google: Gemini 2.0 Flash Exp (free)', isFree: true, contextLength: 1048576 },
+      { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta: Llama 3.3 70B Instruct (free)', isFree: true, contextLength: 131072 },
+      { id: 'deepseek/deepseek-r1:free', name: 'DeepSeek: R1 (free)', isFree: true, contextLength: 65536 },
+      { id: 'deepseek/deepseek-chat:free', name: 'DeepSeek: DeepSeek V3 (free)', isFree: true, contextLength: 65536 },
+      { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B Instruct (free)', isFree: true, contextLength: 32768 },
+      { id: 'qwen/qwen-2.5-72b-instruct:free', name: 'Qwen 2.5 72B Instruct (free)', isFree: true, contextLength: 32768 },
+      { id: 'google/gemini-2.0-flash-001', name: 'Google: Gemini 2.0 Flash', isFree: false, contextLength: 1048576 },
+      { id: 'anthropic/claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', isFree: false, contextLength: 200000 },
+      { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', isFree: false, contextLength: 128000 }
+    ];
   }
 
   // Generate Learning Plan from Topic

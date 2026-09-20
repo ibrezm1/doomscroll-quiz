@@ -1059,6 +1059,121 @@ html, body {
   color: #fff;
   outline: none;
   font-family: var(--font-main);
+  margin-bottom: 8px;
+}
+
+/* OpenRouter Model Filter & Refresh Styles */
+.model-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mini-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #c4b5fd;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mini-action-btn:hover, .mini-action-btn:active {
+  background: rgba(139, 92, 246, 0.3);
+  color: #fff;
+}
+
+.mini-action-btn.spinning .refresh-icon {
+  animation: spin 0.8s linear infinite;
+}
+
+.model-filter-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-chip .chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+}
+
+.filter-chip.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.model-search-wrapper {
+  margin-bottom: 8px;
+}
+
+.model-search-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: #fff;
+  outline: none;
+  font-family: var(--font-main);
+  transition: border-color 0.2s;
+}
+
+.model-search-input:focus {
+  border-color: var(--cyan);
+}
+
+.model-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.model-count-text {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.quick-free-btn {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 4px;
+}
+
+.quick-free-btn:hover {
+  color: #7dd3fc;
 }
 
 .helper-text {
